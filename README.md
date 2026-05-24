@@ -7,7 +7,7 @@ Public-facing, implementation-agnostic reference for integrating with the Creati
 ## Quick Start
 
 ```bash
-export CREATIVAI_BASE_URL="https://api.creativai.io"
+export CREATIVAI_BASE_URL="https://creativai-apis.com"
 export CREATIVAI_API_KEY="your_api_key"
 
 # Health check
