@@ -31,6 +31,34 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/sharing/invite" \
   }'
 ```
 
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `collection_id` | string | Yes | Collection to invite to |
+| `target_email` | string | Yes | Email of the user to invite |
+| `role` | string | Yes | `"admin"`, `"read_write"`, `"read_only"` |
+| `plate_access` | string | No | `"all"` (default) or `"restricted"` |
+| `plate_permissions` | object | No | Map of `plate_id → "read_write" \| "read_only" \| null` when `plate_access: "restricted"` |
+| `groups` | list[string] | No | Group labels to assign (must already exist) |
+
+**Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "data": {
+    "invitation_id": "inv_abc123",
+    "collection_id": "col_xxx",
+    "target_email": "alice@example.com",
+    "role": "read_write",
+    "plate_access": "all",
+    "status": "pending",
+    "sent_at": "2026-05-25T10:00:00Z"
+  },
+  "error": null
+}
+```
+
 ### Invite with Restricted Plate Access
 
 By default, members see all plates. To restrict a member to specific plates:
@@ -121,6 +149,27 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/sharing/members" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"collection_id": "'$COLLECTION_ID'"}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "members": [
+      {
+        "user_id": "usr_abc",
+        "email": "alice@example.com",
+        "role": "read_write",
+        "plate_access": "all",
+        "groups": ["annotator"],
+        "joined_at": "2026-05-20T09:00:00Z"
+      }
+    ],
+    "total": 1
+  },
+  "error": null
+}
 ```
 
 ### Update Member Role / Permissions

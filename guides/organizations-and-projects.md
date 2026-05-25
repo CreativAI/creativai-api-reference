@@ -2,33 +2,20 @@
 
 Organize collections using a two-level hierarchy: **Organizations** → **Projects** → **Collections**.
 
----
-
-## Endpoints
-
-### Organizations
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v2/organizations` | Create an organization |
-| GET | `/api/v2/organizations` | List your organizations |
-| GET | `/api/v2/organizations/{org_id}` | Get organization details |
-| DELETE | `/api/v2/organizations/{org_id}` | Delete org and all its contents |
-
-### Projects
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v2/organizations/{org_id}/projects` | Create a project in an org |
-| GET | `/api/v2/organizations/{org_id}/projects` | List projects in an org |
-| GET | `/api/v2/organizations/{org_id}/projects/{project_name}` | Get project + its collections |
-| DELETE | `/api/v2/organizations/{org_id}/projects/{project_name}` | Delete project + all collections |
+```
+Organization (Acme Corp)
+  └── Project (Q1 Campaign)
+        └── Collection (TV Ads)
+        └── Collection (Social Media)
+  └── Project (Product Launch)
+        └── Collection (Demo Videos)
+```
 
 ---
 
-## cURL Examples
+## Organizations
 
-### Create an organization
+### Create an Organization
 
 ```bash
 curl -X POST "$CREATIVAI_BASE_URL/api/v2/organizations" \
@@ -37,14 +24,95 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/organizations" \
   -d '{"name": "Acme Corp"}'
 ```
 
-### List organizations
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Organization display name |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "org_id": "org_abc123",
+    "name": "Acme Corp",
+    "owner_id": "usr_xyz789",
+    "created_at": "2026-05-26T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+### List Organizations
 
 ```bash
-curl -X GET "$CREATIVAI_BASE_URL/api/v2/organizations" \
+curl "$CREATIVAI_BASE_URL/api/v2/organizations" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
 ```
 
-### Create a project
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "organizations": [
+      {
+        "org_id": "org_abc123",
+        "name": "Acme Corp",
+        "created_at": "2026-05-26T10:00:00Z"
+      }
+    ]
+  },
+  "error": null
+}
+```
+
+### Get Organization Details
+
+```bash
+curl "$CREATIVAI_BASE_URL/api/v2/organizations/$ORG_ID" \
+  -H "X-API-Key: $CREATIVAI_API_KEY"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "org_id": "org_abc123",
+    "name": "Acme Corp",
+    "owner_id": "usr_xyz789",
+    "projects": ["Q1 Campaign", "Product Launch"],
+    "created_at": "2026-05-26T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+### Delete an Organization
+
+**Irreversible.** Deletes all projects and collections within.
+
+```bash
+curl -X DELETE "$CREATIVAI_BASE_URL/api/v2/organizations/$ORG_ID" \
+  -H "X-API-Key: $CREATIVAI_API_KEY"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": { "message": "Organization org_abc123 deleted" },
+  "error": null
+}
+```
+
+---
+
+## Projects
+
+### Create a Project
 
 ```bash
 curl -X POST "$CREATIVAI_BASE_URL/api/v2/organizations/$ORG_ID/projects" \
@@ -53,20 +121,103 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/organizations/$ORG_ID/projects" \
   -d '{"project_name": "Q1 Campaign"}'
 ```
 
-### Get a project and its collections
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `project_name` | string | Yes | Project name (unique within the org) |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "org_id": "org_abc123",
+    "project_name": "Q1 Campaign",
+    "created_at": "2026-05-26T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+### List Projects
 
 ```bash
-curl -X GET "$CREATIVAI_BASE_URL/api/v2/organizations/$ORG_ID/projects/Q1%20Campaign" \
+curl "$CREATIVAI_BASE_URL/api/v2/organizations/$ORG_ID/projects" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
 ```
 
-### List collections by project
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "projects": [
+      {
+        "project_name": "Q1 Campaign",
+        "collection_count": 3,
+        "created_at": "2026-05-10T09:00:00Z"
+      }
+    ]
+  },
+  "error": null
+}
+```
+
+### Get Project (+ its Collections)
 
 ```bash
+# URL-encode spaces: "Q1 Campaign" → "Q1%20Campaign"
+curl "$CREATIVAI_BASE_URL/api/v2/organizations/$ORG_ID/projects/Q1%20Campaign" \
+  -H "X-API-Key: $CREATIVAI_API_KEY"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "org_id": "org_abc123",
+    "project_name": "Q1 Campaign",
+    "collections": [
+      {
+        "collection_id": "tv-ads_a1b2c3d4",
+        "collection_name": "TV Ads",
+        "total_videos": 12,
+        "indexed": true,
+        "created_at": "2026-05-15T11:00:00Z"
+      }
+    ]
+  },
+  "error": null
+}
+```
+
+### Delete a Project
+
+**Irreversible.** Deletes all collections within.
+
+```bash
+curl -X DELETE "$CREATIVAI_BASE_URL/api/v2/organizations/$ORG_ID/projects/Q1%20Campaign" \
+  -H "X-API-Key: $CREATIVAI_API_KEY"
+```
+
+---
+
+## List Collections by Organization or Project
+
+```bash
+# By organization
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/collections/by-organization" \
+  -H "X-API-Key: $CREATIVAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"organization_id": "org_abc123"}'
+
+# By project
 curl -X POST "$CREATIVAI_BASE_URL/api/v2/collections/by-project" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"org_id": "'"$ORG_ID"'", "project_name": "Q1 Campaign"}'
+  -d '{"organization_id": "org_abc123", "project_name": "Q1 Campaign"}'
 ```
 
 ---
@@ -78,7 +229,7 @@ import os, requests
 
 BASE    = os.environ["CREATIVAI_BASE_URL"]
 KEY     = os.environ["CREATIVAI_API_KEY"]
-headers = {"X-API-Key": KEY}
+headers = {"X-API-Key": KEY, "Content-Type": "application/json"}
 
 # Create org
 org = requests.post(f"{BASE}/api/v2/organizations",
@@ -90,16 +241,18 @@ requests.post(f"{BASE}/api/v2/organizations/{org_id}/projects",
     headers=headers, json={"project_name": "Launch 2026"}).raise_for_status()
 
 # Create collection inside project
-requests.post(f"{BASE}/api/v2/collections", headers=headers, json={
+col = requests.post(f"{BASE}/api/v2/collections", headers=headers, json={
     "collection_name": "Launch Videos",
     "model": "default",
     "organization_id": org_id,
     "project_name": "Launch 2026",
-}).raise_for_status()
+}).json()
+collection_id = col["data"]["collection_id"]
+print(f"Collection: {collection_id}")
 
 # List all collections in project
 cols = requests.post(f"{BASE}/api/v2/collections/by-project",
     headers=headers,
-    json={"org_id": org_id, "project_name": "Launch 2026"}).json()
+    json={"organization_id": org_id, "project_name": "Launch 2026"}).json()
 print(cols["data"])
 ```

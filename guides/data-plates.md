@@ -258,12 +258,14 @@ curl -O -J "$CREATIVAI_BASE_URL/api/v2/data-plates/export-csv/$COLLECTION_ID/$PL
 
 ## Sub-Plates (Annotation & Verification)
 
+> **Use `/api/v3/data-plates/sub-plates/...`** for all sub-plate operations — v3 is the current version.
+
 Sub-plates are child plates for splitting annotation work across a team.
 
 ### Create Sub-Plate
 
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/sub-plates/create" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v3/data-plates/sub-plates/create" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -286,7 +288,7 @@ Sub-plate modes:
 ### Verify a Segment
 
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/sub-plates/verify" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v3/data-plates/sub-plates/verify" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -303,7 +305,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/sub-plates/verify" \
 ### Check Verification Progress
 
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/sub-plates/verification-progress" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v3/data-plates/sub-plates/verification-progress" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"collection_id": "'$COLLECTION_ID'", "sub_plate_id": "'$SUB_PLATE_ID'"}'
