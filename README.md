@@ -281,7 +281,8 @@ Each guide covers one feature area in depth with request/response examples, fiel
 | Guide | What it covers | Real-world example |
 |-------|----------------|--------------------|
 | [organizations-and-projects.md](guides/organizations-and-projects.md) | Create orgs and projects to organise collections, multi-tenant isolation | Agency with multiple clients: each client is a project; each campaign is a collection |
-| [sharing-and-rbac.md](guides/sharing-and-rbac.md) | Invite team members, assign roles, restrict per-plate access, manage groups, assign annotation tasks, FCM push notifications | Invite 5 annotators with `read_write` access restricted to their assigned sub-plate; invite a client with `read_only` access to the final plate |
+| [sharing-and-rbac.md](guides/sharing-and-rbac.md) | Invite team members, assign roles (admin / read_write / read_only), restrict per-plate access, manage groups, FCM push notifications | Invite 5 annotators with `read_write` access restricted to their assigned sub-plate; invite a client with `read_only` access to the final plate |
+| [tasks.md](guides/tasks.md) | Create and assign annotation/verification tasks, track progress, activity log, auto-distribute a plate across a team | Admin creates a verification task for 2,000 near-miss segments; `auto-distribute` splits the work equally across 4 annotators who update progress daily |
 
 ### Billing & Account
 
