@@ -4,7 +4,7 @@ Public-facing, implementation-agnostic reference for integrating with the Creati
 
 **Base URL:** `https://creativai-apis.com`  
 **Current API version:** `v2` (latest stable). Sub-plates and Knowledge Extraction are also available at `v3`.  
-**Interactive docs:** Available in-app at **Settings → API Docs**.
+**Interactive docs:** Available in-app via **API Documentation** in the left sidebar.
 
 ---
 
@@ -14,19 +14,19 @@ Before making any API call you need an API key. Keys are created from the Creati
 
 ### Sign Up / Log In
 
-1. Go to **[app.creativai.io](https://app.creativai.io)** and create an account (or log in).
+1. Go to **[creativ-ai.com](https://creativ-ai.com)** and create an account (or log in).
 2. Verify your email address.
-3. You will land on the **Dashboard** with a free-tier plan active.
+3. You will land on the **Dashboard** with a free-tier plan active and welcome credits applied.
 
-### Create an API Key
+### Find Your API Key
 
-1. Click your **profile avatar** (top-right) → **Settings**.
-2. Navigate to the **API Keys** tab.
-3. Click **Create New Key**, give it a descriptive name (e.g. `dev-local`, `prod-server`).
-4. Copy the key immediately — it is shown **once**. Store it in a secrets manager or `.env` file.
+Your API key is **automatically provisioned** when you sign up — there is nothing to create.
 
-> **Key format:** `<YOUR_API_KEY>`  
-> Keys begin with `sk_live_`. Never commit them to source control.
+1. Click your **profile avatar** in the top-right corner to open the profile dropdown.
+2. Click **API Key** to expand the section.
+3. Click the **copy icon** to copy the key to your clipboard.
+
+> **Key format:** Keys begin with `sk_live_`. Never commit them to source control.
 
 ### Rotate or Revoke a Key
 
@@ -193,7 +193,7 @@ creativai-api-reference/
 | [organizations-and-projects.md](guides/organizations-and-projects.md) | Org → Project → Collection hierarchy |
 | [sharing-and-rbac.md](guides/sharing-and-rbac.md) | Invite, roles, groups, tasks, FCM push |
 | [online-and-youtube-search.md](guides/online-and-youtube-search.md) | YouTube discovery and import |
-| [users-billing-subscriptions.md](guides/users-billing-subscriptions.md) | Account, API keys, credits, invoices |
+| [users-billing-subscriptions.md](guides/users-billing-subscriptions.md) | Account, credits, transactions, invoices |
 | [async-jobs.md](guides/async-jobs.md) | Polling pattern, status values, backoff |
 | [errors.md](guides/errors.md) | Error codes, retry strategy, backoff |
 | [integration-guidelines.md](guides/integration-guidelines.md) | Best practices, logging, security, governance |

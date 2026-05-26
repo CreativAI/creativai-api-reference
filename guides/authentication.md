@@ -2,36 +2,33 @@
 
 ## How to Get Your API Key
 
-All API calls (except public endpoints like `/health`) require an API key. Here is the complete flow.
+All API calls (except public endpoints like `/health`) require an API key.
 
 ### 1. Create an Account
 
-Sign up at **[app.creativai.io](https://app.creativai.io)**. After email verification you will land on the Dashboard with a free-tier plan active and welcome credits already applied.
+Sign up at **[creativ-ai.com](https://creativ-ai.com)**. After email verification you will land on the Dashboard with a free-tier plan active and welcome credits already applied.
 
-### 2. Open the API Keys Panel
+### 2. Copy Your API Key
 
-1. Click your **profile avatar** in the top-right corner.
-2. Select **Settings**.
-3. Click the **API Keys** tab.
+Your API key is **automatically provisioned** on signup — there is nothing to create.
 
-### 3. Generate a Key
+1. Click your **profile avatar** in the top-right corner to open the profile dropdown.
+2. Scroll to the **API Key** section at the bottom of the dropdown.
+3. Click **API Key** to expand and reveal the key.
+4. Click the **copy icon** to copy it to your clipboard.
 
-1. Click **Create New Key**.
-2. Enter a descriptive label — e.g. `dev-local`, `ci-pipeline`, `prod-server`.
-3. Click **Generate**.
-4. **Copy the key immediately** — the full secret is shown only once. Store it in a `.env` file or a secrets manager.
+> Keys begin with `sk_live_`. Never commit API keys to source control.
 
-> **Key format:** `<YOUR_API_KEY>`  
-> All keys start with `sk_live_`. Never commit API keys to source control.
+The API key is also visible in the same way from the **account menu** at the bottom of the left sidebar.
 
-### 4. Set Your Environment Variables
+### 3. Set Your Environment Variables
 
 ```bash
 export CREATIVAI_BASE_URL="https://creativai-apis.com"
 export CREATIVAI_API_KEY="<YOUR_API_KEY>"
 ```
 
-### 5. Verify the Key
+### 4. Verify the Key
 
 ```bash
 curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
