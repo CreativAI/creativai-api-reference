@@ -1,6 +1,6 @@
 # Knowledge Extraction
 
-> **Version note:** All Knowledge Extraction endpoints use **`/api/v3/knowledge-extraction/...`**. Use v3 for all new integrations.
+> Version note: use `/api/v2/knowledge-extraction/...` for all Knowledge Extraction endpoints.
 
 Knowledge Extraction uses AI to answer questions about every video segment in a data plate, producing a structured spreadsheet of AI-generated answers. It also includes a conversational chat interface for synthesizing insights from plate data.
 
@@ -16,7 +16,7 @@ Knowledge Extraction uses AI to answer questions about every video segment in a 
 ## Add a Column (Extract Information)
 
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/columns/add" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/columns/add" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -34,7 +34,7 @@ Returns `202 Accepted` with `job_id`. Poll for completion.
 Pass a list to process multiple questions in a single LLM call per segment:
 
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/columns/add" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/columns/add" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -55,7 +55,7 @@ Provide reference images to help the model identify specific people or objects:
 
 ```bash
 # Step 1: Upload reference images
-IMG=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/chat/upload-images" \
+IMG=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/chat/upload-images" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"count": 2, "content_type": "image/jpeg"}')
@@ -63,7 +63,7 @@ IMG=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/chat/uplo
 # PUT each image to its presigned upload_url...
 
 # Step 2: Add column with image context
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/columns/add" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/columns/add" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -71,7 +71,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/columns/add" \
     "plate_id": "'$PLATE_ID'",
     "question": "Is the person in the reference image visible in this segment?",
     "model_version": "pro",
-    "image_keys": ["uploads/session_xyz/img_0.jpg", "uploads/session_xyz/img_1.jpg"]
+    "image_keys": ["chat_images/<user_id>/<upload_group>/img_0.jpg", "chat_images/<user_id>/<upload_group>/img_1.jpg"]
   }'
 ```
 
@@ -89,7 +89,7 @@ Maximum 10 reference images.
 ## Poll Extraction Job Status
 
 ```bash
-curl "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/jobs/$JOB_ID" \
+curl "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/jobs/$JOB_ID" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
 ```
 
@@ -118,7 +118,7 @@ Response:
 ## List Columns in a Plate
 
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/columns/list" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/columns/list" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -132,7 +132,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/columns/list" \
 ## Remove a Column
 
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/columns/remove" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/columns/remove" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -157,7 +157,7 @@ Attach images to provide visual context in a chat query:
 
 ```bash
 # Step 1: Get presigned upload URLs
-IMG=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/chat/upload-images" \
+IMG=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/chat/upload-images" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -179,7 +179,7 @@ Supported MIME types: `image/jpeg`, `image/png`, `image/webp`, `image/gif`, `ima
 ### Run a Chat Query
 
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/chat/query" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/chat/query" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -194,7 +194,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/chat/query" \
 Continue a previous conversation:
 
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/chat/query" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/chat/query" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -210,7 +210,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/chat/query" \
 ### Chat with Image Reference
 
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/chat/query" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/chat/query" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -234,7 +234,7 @@ Knowledge Extraction automatically generates chart-ready summaries:
 
 ```bash
 # Charts for a specific plate
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/charts/plate" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/charts/plate" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -244,7 +244,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/charts/plate" \
   }'
 
 # Charts across all plates in a collection
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/charts/collection" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/charts/collection" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -287,7 +287,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/chat/sessions/update-title" \
 
 ```bash
 # 1. Add multiple columns
-JOB=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/columns/add" \
+JOB=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/columns/add" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -304,7 +304,7 @@ JOB_ID=$(echo $JOB | python3 -c "import sys,json; print(json.load(sys.stdin)['da
 
 # 2. Poll until complete
 while true; do
-  STATUS=$(curl -s "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/jobs/$JOB_ID" \
+  STATUS=$(curl -s "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/jobs/$JOB_ID" \
     -H "X-API-Key: $CREATIVAI_API_KEY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['status'])")
   echo "Status: $STATUS"
   [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ] && break
@@ -312,7 +312,7 @@ while true; do
 done
 
 # 3. Query the results
-curl -X POST "$CREATIVAI_BASE_URL/api/v3/knowledge-extraction/chat/query" \
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/knowledge-extraction/chat/query" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{

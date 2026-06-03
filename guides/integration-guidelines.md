@@ -6,8 +6,8 @@ Best practices for building production-grade integrations with the CreativAI API
 
 ## API Versioning
 
-- All stable endpoints live at `/api/v2/`. Default to this unless a feature is explicitly documented under `/api/v3/`.
-- **Use v3 for**: Sub-plates (`/api/v3/data-plates/sub-plates/...`) and Knowledge Extraction when you need the latest model capabilities.
+- All stable endpoints live at `/api/v2/`.
+- If older clients still call `/api/v3/` aliases, migrate them to `/api/v2/`.
 - Pin client behavior to documented response fields. Do not rely on undocumented fields — they may change without notice.
 - Follow the release notes and update this reference folder in lockstep with backend deploys.
 
@@ -19,7 +19,7 @@ Best practices for building production-grade integrations with the CreativAI API
 - Store keys in environment variables or a secrets manager (AWS Secrets Manager, HashiCorp Vault, GCP Secret Manager, Doppler).
 - **Never** commit API keys to source control or embed them in client-side JavaScript, mobile bundles, or Docker images.
 - Rotate keys on a schedule (quarterly for most apps; immediately after a suspected leak).
-- Revoke compromised keys immediately via `DELETE /api/v2/api-keys/{key_id}`.
+- Revoke compromised keys immediately from the dashboard key manager.
 
 ---
 

@@ -35,7 +35,7 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
 ```
 
-**Request:** `GET /api/v2/users/api-key-check` (no auth required — test from anywhere)
+**Request:** `GET /api/v2/users/api-key-check` (authenticated — send your API key)
 
 **Response (valid key):**
 ```json
@@ -64,85 +64,39 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
 
 ## Manage API Keys
 
-### List All Keys
+### Get Existing Key (Dashboard Clients)
 
-Returns key metadata (ID, name, created date). The secret value is never returned after creation.
+`/api/v2/api-keys` endpoints are intended for authenticated dashboard clients and require a Firebase ID token in `Authorization: Bearer <token>`.
 
 ```bash
 curl "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "X-API-Key: $CREATIVAI_API_KEY"
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
 ```
 
 **Response:**
 ```json
-{
-  "success": true,
-  "data": {
-    "api_keys": [
-      {
-        "key_id": "key_abc123",
-        "name": "dev-local",
-        "created_at": "2026-05-01T09:00:00Z",
-        "last_used_at": "2026-05-26T08:42:00Z"
-      },
-      {
-        "key_id": "key_def456",
-        "name": "ci-pipeline",
-        "created_at": "2026-05-10T14:30:00Z",
-        "last_used_at": null
-      }
-    ]
-  },
-  "error": null
-}
+{ "api_key": "sk_live_xxx" }
 ```
 
-### Create a New Key
+If no key exists yet:
+
+```json
+{ "api_key": null }
+```
+
+### Create Key If Missing (Dashboard Clients)
 
 ```bash
 curl -X POST "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "X-API-Key: $CREATIVAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "ci-pipeline"}'
-```
-
-**Request body:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Human-readable label for this key |
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "key_id": "key_ghi789",
-    "name": "ci-pipeline",
-    "api_key": "<YOUR_API_KEY>",
-    "created_at": "2026-05-26T10:00:00Z"
-  },
-  "error": null
-}
-```
-
-> Copy `api_key` from this response. It will not be shown again.
-
-### Revoke a Key
-
-```bash
-curl -X DELETE "$CREATIVAI_BASE_URL/api/v2/api-keys/{key_id}" \
-  -H "X-API-Key: $CREATIVAI_API_KEY"
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
 ```
 
 **Response:**
 ```json
-{
-  "success": true,
-  "data": { "message": "API key revoked" },
-  "error": null
-}
+{ "api_key": "sk_live_xxx" }
 ```
+
+This call is idempotent: if a key already exists, the existing key is returned.
 
 ---
 
@@ -169,8 +123,7 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/me" \
 {
   "success": true,
   "data": {
-    "user_id": "usr_abc123",
-    "email": "you@example.com"
+    "user_id": "usr_abc123"
   },
   "error": null
 }
@@ -192,7 +145,8 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/me/info" \
     "credits": 150.0,
     "total_indexed_hours": 4.5,
     "search_requests": 128,
-    "total_clips_analyzed": 340
+    "total_videos_analyzed": 340,
+    "total_images_analyzed": 12
   },
   "error": null
 }
@@ -288,7 +242,7 @@ Do not use this form for non-browser clients.
 - **Never embed API keys** in frontend JavaScript, mobile app binaries, or any client-side code
 - **Store keys in environment variables** or a secrets manager (AWS Secrets Manager, HashiCorp Vault, GCP Secret Manager)
 - **One key per environment** — maintain separate keys for development, staging, and production
-- **Rotate keys periodically** — create a new key, update your configuration, then revoke the old key
-- **Revoke compromised keys immediately** — use the dashboard or the `DELETE /api/v2/api-keys/{key_id}` endpoint
+- **Rotate keys periodically** — generate/replace keys from the dashboard key manager
+- **Revoke compromised keys immediately** — use the dashboard key manager
 - **HTTPS only** — the API does not accept HTTP connections
 - **Use least-privilege roles** — share collections with the minimum role needed; prefer `read_only` for consumers

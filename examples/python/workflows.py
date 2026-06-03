@@ -112,34 +112,41 @@ def workflow_data_plates_ke(collection_id: str):
     """
     print("=== Workflow 3: Data Plates & KE ===\n")
 
-    # 1. Create plate
+    # 1. Search for segments first (get search_id)
+    search_resp = client.search(collection_id, query="person not wearing hard hat on construction site", top_k=50)
+    search_id = search_resp.get("search_id")
+    print(f"Search ID: {search_id}")
+
+    # 2. Create plate from search results
     plate_resp = client.create_plate(
         collection_id=collection_id,
+        search_id=search_id,
         name="Safety Incidents Q1",
-        search_query="person not wearing hard hat on construction site",
         top_k=50,
     )
-    plate_id = plate_resp.get("plate_id") or plate_resp.get("data", {}).get("plate_id")
+    job_id = plate_resp.get("job_id")
+    print(f"Plate creation job: {job_id}")
+    
+    # Poll for completion
+    plate_id = None
+    if job_id:
+        print("  Waiting for plate creation job...")
+        while True:
+            status = client._data(client._get(f"data-plates/jobs/{job_id}"))
+            print(f"  Job status: {status.get('status')}")
+            if status.get("status") in ("completed", "failed"):
+                plate_id = status.get("plate_id")
+                break
+            time.sleep(5)
+    
+    if not plate_id:
+        plate_id = plate_resp.get("plate_id")
     print(f"Plate created: {plate_id}")
 
-    if not plate_id:
-        # Job-based creation
-        job_id = plate_resp.get("job_id")
-        if job_id:
-            print("  Waiting for plate job...")
-            while True:
-                status = client._data(client._get(f"data-plates/jobs/{job_id}"))
-                print(f"  Job status: {status.get('status')}")
-                if status.get("status") in ("completed", "failed"):
-                    plate_id = status.get("plate_id")
-                    break
-                time.sleep(5)
-
-    # 2. Add KE column — single question
+    # 3. Add KE column — single question
     ke = client.add_ke_column(
         collection_id=collection_id,
         plate_id=plate_id,
-        column_name="PPE Violations",
         question="What PPE violations are visible? List missing equipment.",
         model_version="base",
     )
@@ -147,11 +154,10 @@ def workflow_data_plates_ke(collection_id: str):
     print(f"\nKE job started: {job_id}")
     client.wait_for_ke_job(job_id)
 
-    # 3. Add KE column — multiple questions at once
+    # 4. Add KE column — multiple questions at once (concurrent)
     ke2 = client.add_ke_column(
         collection_id=collection_id,
         plate_id=plate_id,
-        column_name="Site Audit",
         question=[
             "How many workers are visible?",
             "Is heavy machinery operating?",
@@ -162,17 +168,18 @@ def workflow_data_plates_ke(collection_id: str):
     client.wait_for_ke_job(ke2["job_id"])
     print("KE columns complete")
 
-    # 4. Export to CSV
+    # 5. Export to CSV
     out = Path("/tmp/safety_incidents_q1.csv")
     client.export_plate_csv(collection_id, plate_id, out)
     print(f"\nCSV exported to: {out}")
 
-    # 5. Conversational Q&A
+    # 6. Conversational Q&A with AI synthesis
     print("\nKE Chat query:")
     chat = client.ke_chat_query(
         collection_id=collection_id,
         plate_id=plate_id,
-        message="Which camera location has the most PPE violations?",
+        query="Which camera location has the most PPE violations?",
+        model_version="base",
         aggregate_segments=True,
     )
     print(f"  Answer: {chat.get('message', chat)[:300]}")
@@ -200,7 +207,7 @@ def workflow_agentic_chat(collection_id: str, questions: list[str]):
         full_response = ""
         interrupt_type = None
 
-        for event in client.chat_stream(session_id, collection_id, message=question):
+        for event in client.agentic_chat_stream(session_id, collection_id, message=question):
             et = event.get("event")
             data = event.get("data", {})
 

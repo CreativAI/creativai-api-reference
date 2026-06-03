@@ -2,7 +2,7 @@
 
 > Last updated: 2026-05-26  
 > This document is published as integration reference and intentionally excludes backend implementation details.  
-> **Version policy:** When an endpoint exists in both v2 and v3, only the **latest version (v3)** is shown. Use the version listed here for all new integrations.  
+> **Version policy:** Use `/api/v2/` for all client integrations. Some deployments still expose `/api/v3/` aliases for backward compatibility.  
 > **Base URL:** `https://creativai-apis.com`  
 > **Auth:** `X-API-Key: <KEY>` or `Authorization: Bearer <KEY>`  
 > **Response envelope:** `{"success": bool, "data": <payload>, "error": {"code": "...", "message": "...", "details": {}, "timestamp": "..."}}`
@@ -13,7 +13,7 @@
 
 | Module | # Endpoints | Notes |
 |--------|-------------|-------|
-| Health | 3 | No auth |
+| Health | 4 | No auth |
 | Organizations | 4 | |
 | Projects | 4 | |
 | Collections | 8 | |
@@ -23,8 +23,8 @@
 | Indexing | 6 | Async (202) |
 | Search | 1 | |
 | Data Plates | 16 | v2 routes |
-| Sub-Plates | 9 | **v3** (latest) |
-| Knowledge Extraction | 8 | **v3** (latest) |
+| Sub-Plates | 9 | v2 |
+| Knowledge Extraction | 8 | v2 |
 | Chat (Plate Sessions) | 5 | |
 | Agentic Chat | 12 | SSE streaming |
 | Collection Sharing & RBAC | 25 | |
@@ -53,6 +53,7 @@
 | GET | `/` | No | API root / version info |
 | GET | `/health` | No | Health check for load balancers |
 | GET | `/health/simple` | No | Minimal ALB liveness probe |
+| GET | `/api/v2/health` | No | Versioned health endpoint |
 
 ---
 
@@ -206,9 +207,7 @@ Prefix: `/api/v2/data-plates`
 
 ## 11. Sub-Plates
 
-> **Use `/api/v3/data-plates/sub-plates/...`** — v3 is the current and recommended version.
-
-Prefix: `/api/v3/data-plates/sub-plates`
+Prefix: `/api/v2/data-plates/sub-plates`
 
 | Method | Path (suffix) | Auth | Description |
 |--------|--------------|------|-------------|
@@ -226,20 +225,18 @@ Prefix: `/api/v3/data-plates/sub-plates`
 
 ## 12. Knowledge Extraction
 
-> **Use `/api/v3/knowledge-extraction/...`** — v3 is the current and recommended version.
-
-Prefix: `/api/v3/knowledge-extraction`
+Prefix: `/api/v2/knowledge-extraction`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/v3/knowledge-extraction/columns/add` | Yes | Add extraction columns (questions) to plate (202) |
-| POST | `/api/v3/knowledge-extraction/columns/list` | Yes | List extracted columns in plate |
-| POST | `/api/v3/knowledge-extraction/columns/remove` | Yes | Remove extraction column from all segments |
-| GET | `/api/v3/knowledge-extraction/jobs/{job_id}` | Yes | Poll extraction job status |
-| POST | `/api/v3/knowledge-extraction/chat/upload-images` | Yes | Get presigned URLs for chat image attachments |
-| POST | `/api/v3/knowledge-extraction/chat/query` | Yes | Query plate data with AI synthesis |
-| POST | `/api/v3/knowledge-extraction/charts/plate` | Yes | Get auto-generated charts for a plate |
-| POST | `/api/v3/knowledge-extraction/charts/collection` | Yes | Get charts across all plates in collection |
+| POST | `/api/v2/knowledge-extraction/columns/add` | Yes | Add extraction columns (questions) to plate (202) |
+| POST | `/api/v2/knowledge-extraction/columns/list` | Yes | List extracted columns in plate |
+| POST | `/api/v2/knowledge-extraction/columns/remove` | Yes | Remove extraction column from all segments |
+| GET | `/api/v2/knowledge-extraction/jobs/{job_id}` | Yes | Poll extraction job status |
+| POST | `/api/v2/knowledge-extraction/chat/upload-images` | Yes | Get presigned URLs for chat image attachments |
+| POST | `/api/v2/knowledge-extraction/chat/query` | Yes | Query plate data with AI synthesis |
+| POST | `/api/v2/knowledge-extraction/charts/plate` | Yes | Get auto-generated charts for a plate |
+| POST | `/api/v2/knowledge-extraction/charts/collection` | Yes | Get charts across all plates in collection |
 
 ---
 
@@ -478,9 +475,14 @@ Prefix: `/api/v2/users`
 | GET | `/api/v2/users/me` | Yes | Get current user ID |
 | GET | `/api/v2/users/me/uploaded-hours` | Yes | Total uploaded hours + storage |
 | GET | `/api/v2/users/me/info` | Yes | Credits, hours, search requests |
-| GET | `/api/v2/users/api-key-check` | No | Validate API key (no auth required) |
+| GET | `/api/v2/users/get_users_info` | Yes | Get account info (legacy alias) |
+| GET | `/api/v2/users/api-key-check` | Yes | Validate API key for authenticated caller |
+| GET | `/api/v2/users/api-key-check/{user_id_param}` | Yes | Validate API key for explicit user ID (admin/internal use) |
 | POST | `/api/v2/users/credits/claim-welcome` | Yes | Claim one-time welcome credits |
 | POST | `/api/v2/users/credits/validate-indexing` | Yes | Check credit sufficiency for indexing |
+| POST | `/api/v2/users/credits/validate-video-qa` | Yes | Check credit sufficiency for video QA |
+| POST | `/api/v2/users/credits/consume-video-qa` | Yes | Consume credits for video QA |
+| POST | `/api/v2/users/credits/consume-indexing` | Yes | Consume credits for indexing |
 
 ### API Keys
 
@@ -488,9 +490,8 @@ Prefix: `/api/v2/api-keys`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v2/api-keys` | Yes | List API keys (metadata only; secret never returned) |
-| POST | `/api/v2/api-keys` | Yes | Create a new API key |
-| DELETE | `/api/v2/api-keys/{key_id}` | Yes | Revoke an API key |
+| GET | `/api/v2/api-keys` | Firebase Bearer token | Get caller API key (or null if none exists) |
+| POST | `/api/v2/api-keys` | Firebase Bearer token | Create key if missing (returns existing if already created) |
 
 ---
 

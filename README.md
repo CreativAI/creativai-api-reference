@@ -10,7 +10,7 @@ CreativAI is a **Video Intelligence Platform** that lets you upload, index, sear
 - **Team annotation workflows** — divide footage into sub-plates, assign segments to annotators, track verification progress
 
 **Base URL:** `https://creativai-apis.com`  
-**Current API version:** `v2` (latest stable). Sub-plates and Knowledge Extraction are also available at `v3`.  
+**Current API version:** `v2` (current and recommended for all features).  
 **Interactive docs:** Available in-app via **API Documentation** in the left sidebar.
 
 ---
@@ -19,14 +19,13 @@ CreativAI is a **Video Intelligence Platform** that lets you upload, index, sear
 
 | Use Case | Industry | Key APIs Used |
 |----------|----------|---------------|
-| Search body-cam footage for a suspect description | Law enforcement / security | Collections → Indexing → Search |
-| Auto-tag product placement in broadcast recordings | Media & advertising | Collections → Indexing → Knowledge Extraction |
-| Monitor construction site PPE compliance from CCTV | Safety & compliance | Live Stream → Knowledge Extraction |
-| Build a highlight reel engine for sports footage | Sports media | Collections → Indexing → Search → Data Plates |
-| Detect anomalies in manufacturing line camera feeds | Industrial IoT | Live Stream → Agentic Chat |
-| Curate and annotate training datasets from video | AI/ML teams | Collections → Data Plates → Sub-Plates → Knowledge Extraction |
-| Power a natural-language Q&A over medical procedure recordings | Healthcare | Collections → Indexing → Agentic Chat |
-| Sync YouTube tutorials into a searchable company knowledge base | EdTech / L&D | YouTube Search → Collections → Knowledge Extraction |
+| Build searchable visual memory for autonomous systems | Robotics & Embodied AI | Collections → Indexing → Search → Data Plates |
+| Find rare visual events and generate structured labels at scale | Research & Visual Data | Collections → Indexing → Data Plates → Knowledge Extraction |
+| Detect suspicious activity and generate incident timelines | Public Safety & Security | Live Stream → Data Plates → Knowledge Extraction |
+| Auto-tag scenes, people, objects, and brand moments in archives | Media & Entertainment | Collections → Indexing → Search → Knowledge Extraction |
+| Analyze game footage for highlights and tactical patterns | Sports | Collections → Indexing → Search → Data Plates |
+| Query multi-modal datasets (videos, images, PDFs) in one workflow | Cross-Industry Operations | Collections → Indexing → Search → Agentic Chat |
+| Enrich collection insights with visual charts and summaries | Analytics & BI | Knowledge Extraction → Charts |
 
 ---
 
@@ -50,25 +49,21 @@ Your API key is **automatically provisioned** when you sign up — there is noth
 
 > **Key format:** Keys begin with `sk_live_`. Never commit them to source control.
 
-### Rotate or Revoke a Key
+### Programmatic API Key Endpoints
 
 ```bash
+# Programmatic key retrieval/creation uses Firebase ID token auth,
+# not X-API-Key. This is intended for authenticated dashboard clients.
 export CREATIVAI_BASE_URL="https://creativai-apis.com"
-export CREATIVAI_API_KEY="<YOUR_API_KEY>"
+export FIREBASE_ID_TOKEN="<FIREBASE_ID_TOKEN>"
 
-# List all your keys (IDs + names; secret value is never returned)
+# Get existing API key (or null)
 curl "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "X-API-Key: $CREATIVAI_API_KEY"
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
 
-# Create a new key programmatically
+# Create key if missing (returns existing key if already created)
 curl -X POST "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "X-API-Key: $CREATIVAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "ci-pipeline"}'
-
-# Revoke a key by ID
-curl -X DELETE "$CREATIVAI_BASE_URL/api/v2/api-keys/{key_id}" \
-  -H "X-API-Key: $CREATIVAI_API_KEY"
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
 ```
 
 ---
@@ -201,9 +196,8 @@ Always check `success` first. If `false`, inspect `error.code` — see [errors.m
 | Version | Status | Use when |
 |---------|--------|----------|
 | `/api/v2/` | Current stable | All features |
-| `/api/v3/` | Latest for select endpoints | Sub-plates, Knowledge Extraction (preferred) |
 
-When a v3 route exists, always use v3. This reference shows the latest available version for each endpoint.
+If legacy `/api/v3/` aliases exist in older clients, migrate to `/api/v2/`.
 
 ### Async Operations
 
@@ -266,7 +260,7 @@ Each guide covers one feature area in depth with request/response examples, fiel
 | Guide | What it covers | Real-world example |
 |-------|----------------|--------------------|
 | [data-plates.md](guides/data-plates.md) | Create a plate from search results or an entire collection, manage segments, add/remove columns, run verification workflows via sub-plates, export to CSV | Create a plate of all "near-miss" incidents from warehouse footage, assign segments to a safety review team |
-| [knowledge-extraction.md](guides/knowledge-extraction.md) | Add AI extraction columns (questions answered per-segment), poll jobs, chat with plate data, auto-generated charts — all on `/api/v3/` | Ask "Is the worker wearing a hard hat?" across 2,000 segments; export a compliance report |
+| [knowledge-extraction.md](guides/knowledge-extraction.md) | Add AI extraction columns (questions answered per-segment), poll jobs, chat with plate data, auto-generated charts on `/api/v2/knowledge-extraction/...` | Ask "Is the worker wearing a hard hat?" across 2,000 segments; export a compliance report |
 | [agentic-chat.md](guides/agentic-chat.md) | SSE streaming AI agent, multi-step search planning, interrupts (search feedback, YouTube candidates), stop/resume, reconnect after disconnect | "Summarise all camera angles that show a vehicle entering between 2 AM and 4 AM and compare to last week" — agent searches, synthesises, and cites clips |
 
 ### Live & Online Video
@@ -330,4 +324,4 @@ python examples/python/workflows.py
 - This is reference documentation only — no backend implementation code is included.
 - Internal webhook endpoints (`/internal/...`) are listed for architecture context; they are called by infrastructure, not external clients.
 - Endpoint behaviour and credit pricing can evolve — keep this folder in sync with backend releases.
-- The [endpoint-registry.md](reference/endpoint-registry.md) shows the latest version for each endpoint. When both v2 and v3 exist for a route, only v3 is listed.
+- The [endpoint-registry.md](reference/endpoint-registry.md) lists the current v2 endpoints for integration.

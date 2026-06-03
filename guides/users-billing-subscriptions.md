@@ -18,8 +18,7 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/me" \
 {
   "success": true,
   "data": {
-    "user_id": "usr_abc123",
-    "email": "you@example.com"
+    "user_id": "usr_abc123"
   },
   "error": null
 }
@@ -43,7 +42,8 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/me/info" \
     "credits": 150.0,
     "total_indexed_hours": 12.5,
     "search_requests": 248,
-    "total_clips_analyzed": 1840
+    "total_videos_analyzed": 1840,
+    "total_images_analyzed": 96
   },
   "error": null
 }
@@ -62,13 +62,13 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/me/uploaded-hours" \
   "success": true,
   "data": {
     "total_uploaded_hours": 18.3,
-    "storage_used_gb": 64.2
+    "total_files_size_GB": 64.2
   },
   "error": null
 }
 ```
 
-### Verify API Key (no auth required)
+### Verify API Key
 
 ```bash
 curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
@@ -120,10 +120,10 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/users/credits/validate-indexing" \
 {
   "success": true,
   "data": {
-    "sufficient": true,
-    "current_balance": 150.0,
-    "estimated_cost": 26.4,
-    "remaining_after": 123.6
+    "success": true,
+    "user_credits": 150.0,
+    "cost": 26.4,
+    "files_to_be_indexed": ["s3://bucket/collections/col_xxx/uploads/sample.mp4"]
   },
   "error": null
 }
@@ -133,81 +133,28 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/users/credits/validate-indexing" \
 
 ## API Keys
 
-API keys authenticate all your API requests. See [authentication.md](authentication.md) for the full key acquisition flow.
+API keys authenticate all API requests. See [authentication.md](authentication.md) for the full dashboard flow.
 
-### List API Keys
-
-Returns metadata for all your keys. Secret values are never returned.
+`/api/v2/api-keys` endpoints are for dashboard clients and require a Firebase ID token:
 
 ```bash
 curl "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "X-API-Key: $CREATIVAI_API_KEY"
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
 ```
 
 **Response:**
 ```json
-{
-  "success": true,
-  "data": {
-    "api_keys": [
-      {
-        "key_id": "key_abc123",
-        "name": "dev-local",
-        "created_at": "2026-05-01T09:00:00Z",
-        "last_used_at": "2026-05-26T08:42:00Z"
-      }
-    ]
-  },
-  "error": null
-}
+{ "api_key": "sk_live_xxx" }
 ```
 
-### Create an API Key
+Create if missing:
 
 ```bash
 curl -X POST "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "X-API-Key: $CREATIVAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "ci-pipeline"}'
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
 ```
 
-**Request body:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Descriptive label for this key |
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "key_id": "key_ghi789",
-    "name": "ci-pipeline",
-    "api_key": "<YOUR_API_KEY>",
-    "created_at": "2026-05-26T10:00:00Z"
-  },
-  "error": null
-}
-```
-
-> Copy `api_key` immediately — it is shown only once.
-
-### Revoke an API Key
-
-```bash
-curl -X DELETE "$CREATIVAI_BASE_URL/api/v2/api-keys/{key_id}" \
-  -H "X-API-Key: $CREATIVAI_API_KEY"
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": { "message": "API key revoked" },
-  "error": null
-}
-```
+This call returns the existing key if one already exists.
 
 ---
 

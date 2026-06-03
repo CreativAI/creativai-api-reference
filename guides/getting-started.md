@@ -79,7 +79,8 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/me/info" \
     "credits": 150.0,
     "total_indexed_hours": 0.0,
     "search_requests": 0,
-    "total_clips_analyzed": 0
+    "total_videos_analyzed": 0,
+    "total_images_analyzed": 0
   },
   "error": null
 }

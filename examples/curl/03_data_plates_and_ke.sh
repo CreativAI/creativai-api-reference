@@ -24,12 +24,25 @@ poll_job() {
 
 # ─── Create Plate from Search ─────────────────────────────────────────────────
 echo "=== 1. Create plate from search results ==="
+# First run a search to get search_id
+SEARCH=$(curl -sf -X POST "$BASE/api/v2/search" \
+  -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d "{
+    \"collection_id\": \"$COL_ID\",
+    \"text_query\": \"person not wearing hard hat on construction site\",
+    \"search_type\": \"hybrid\"
+  }")
+echo "$SEARCH" | python3 -m json.tool
+SEARCH_ID=$(echo "$SEARCH" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['search_id'])")
+echo "Search ID: $SEARCH_ID"
+
+# Now create plate from search results
 PLATE=$(curl -sf -X POST "$BASE/api/v2/data-plates/create" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d "{
     \"collection_id\": \"$COL_ID\",
-    \"plate_name\": \"PPE Violations Q1\",
-    \"search_query\": \"person not wearing hard hat on construction site\",
+    \"search_id\": \"$SEARCH_ID\",
+    \"name\": \"PPE Violations Q1\",
     \"top_k\": 50
   }")
 echo "$PLATE" | python3 -m json.tool
@@ -46,7 +59,7 @@ curl -sf -X POST "$BASE/api/v2/data-plates/create-from-collection" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d "{
     \"collection_id\": \"$COL_ID\",
-    \"plate_name\": \"All Footage Q1\"
+    \"name\": \"All Footage Q1\"
   }" | python3 -m json.tool
 
 echo "=== 3. List plates ==="
@@ -67,9 +80,7 @@ curl -sf -X POST "$BASE/api/v2/data-plates/segments/add" \
   -d "{
     \"collection_id\": \"$COL_ID\",
     \"plate_id\": \"$PLATE_ID\",
-    \"segments\": [
-      {\"chunk_id\": \"chunk_001\", \"start_time\": 0.0, \"end_time\": 16.0}
-    ]
+    \"segment_ids\": [\"seg_001\", \"seg_002\"]
   }" | python3 -m json.tool
 
 echo "=== 6. Remove segments ==="
@@ -78,7 +89,7 @@ curl -sf -X POST "$BASE/api/v2/data-plates/segments/remove" \
   -d "{
     \"collection_id\": \"$COL_ID\",
     \"plate_id\": \"$PLATE_ID\",
-    \"chunk_ids\": [\"chunk_001\"]
+    \"segment_ids\": [\"seg_001\"]
   }" | python3 -m json.tool
 
 echo "=== 7. Locate segment in source video ==="
@@ -87,7 +98,8 @@ curl -sf -X POST "$BASE/api/v2/data-plates/segments/locate" \
   -d "{
     \"collection_id\": \"$COL_ID\",
     \"plate_id\": \"$PLATE_ID\",
-    \"chunk_id\": \"chunk_002\"
+    \"segment_id\": \"seg_002\",
+    \"page_size\": 50
   }" | python3 -m json.tool
 
 # ─── Sub-Plates ───────────────────────────────────────────────────────────────
@@ -96,13 +108,9 @@ curl -sf -X POST "$BASE/api/v2/data-plates/sub-plates/create" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d "{
     \"collection_id\": \"$COL_ID\",
-    \"plate_id\": \"$PLATE_ID\",
-    \"sub_plate_name\": \"High Severity Only\",
-    \"mode\": \"filter\",
-    \"filters\": {
-      \"column_name\": \"severity\",
-      \"value\": \"high\"
-    }
+    \"parent_plate_id\": \"$PLATE_ID\",
+    \"name\": \"High Severity Only\",
+    \"mode\": \"filter\"
   }" | python3 -m json.tool
 
 echo "=== 9. Create sub-plate (segment wise) ==="
@@ -110,10 +118,10 @@ curl -sf -X POST "$BASE/api/v2/data-plates/sub-plates/create" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d "{
     \"collection_id\": \"$COL_ID\",
-    \"plate_id\": \"$PLATE_ID\",
-    \"sub_plate_name\": \"First 20 Segments\",
+    \"parent_plate_id\": \"$PLATE_ID\",
+    \"name\": \"First 100 Segments\",
     \"mode\": \"segment_wise\",
-    \"segment_range\": {\"start\": 0, \"end\": 20}
+    \"slices\": [{\"start\": 0, \"end\": 100}]
   }" | python3 -m json.tool
 
 # ─── CSV Export ───────────────────────────────────────────────────────────────
@@ -140,7 +148,6 @@ KE_COL=$(curl -sf -X POST "$BASE/api/v2/knowledge-extraction/columns/add" \
   -d "{
     \"collection_id\": \"$COL_ID\",
     \"plate_id\": \"$PLATE_ID\",
-    \"column_name\": \"PPE Violations\",
     \"question\": \"What PPE violations are visible in this segment?\",
     \"model_version\": \"base\"
   }")
@@ -155,7 +162,6 @@ curl -sf -X POST "$BASE/api/v2/knowledge-extraction/columns/add" \
   -d "{
     \"collection_id\": \"$COL_ID\",
     \"plate_id\": \"$PLATE_ID\",
-    \"column_name\": \"Site Audit\",
     \"question\": [
       \"How many workers are in the scene?\",
       \"Are workers wearing PPE?\",
@@ -165,21 +171,23 @@ curl -sf -X POST "$BASE/api/v2/knowledge-extraction/columns/add" \
   }" | python3 -m json.tool
 
 echo "=== 14. Add KE column with image references (Qwen only) ==="
-# First upload reference images
+# First get presigned upload URLs
 UPLOAD_RESP=$(curl -sf -X POST "$BASE/api/v2/knowledge-extraction/chat/upload-images" \
-  -H "X-API-Key: $KEY" \
-  -F "files=@reference_ppe.jpg" \
-  -F "collection_id=$COL_ID")
+  -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"count": 1, "content_type": "image/jpeg"}')
 echo "$UPLOAD_RESP" | python3 -m json.tool
-IMG_KEY=$(echo "$UPLOAD_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['image_keys'][0])" 2>/dev/null || echo "")
+IMG_KEY=$(echo "$UPLOAD_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['uploads'][0]['key'])" 2>/dev/null || echo "")
+UPLOAD_URL=$(echo "$UPLOAD_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['uploads'][0]['upload_url'])" 2>/dev/null || echo "")
 
-if [ -n "$IMG_KEY" ]; then
+if [ -n "$UPLOAD_URL" ] && [ -f "reference_ppe.jpg" ]; then
+  echo "  Uploading image to presigned URL..."
+  curl -X PUT "$UPLOAD_URL" -H "Content-Type: image/jpeg" --data-binary @reference_ppe.jpg
+  
   curl -sf -X POST "$BASE/api/v2/knowledge-extraction/columns/add" \
     -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
     -d "{
       \"collection_id\": \"$COL_ID\",
       \"plate_id\": \"$PLATE_ID\",
-      \"column_name\": \"PPE Match\",
       \"question\": \"Does the worker's equipment match the reference PPE shown in the image?\",
       \"model_version\": \"pro\",
       \"image_keys\": [\"$IMG_KEY\"]
@@ -198,7 +206,8 @@ curl -sf -X POST "$BASE/api/v2/knowledge-extraction/chat/query" \
   -d "{
     \"collection_id\": \"$COL_ID\",
     \"plate_id\": \"$PLATE_ID\",
-    \"message\": \"Summarize the most common safety violations across all segments.\",
+    \"query\": \"Summarize the most common safety violations across all segments.\",
+    \"model_version\": \"base\",
     \"aggregate_segments\": true
   }" | python3 -m json.tool
 
