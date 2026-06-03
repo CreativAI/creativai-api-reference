@@ -10,7 +10,7 @@ Indexing takes your uploaded media, generates AI embeddings, and stores them in 
 Upload → Preprocessing (Lambda, automatic) → Indexing (you trigger) → Search
 ```
 
-- **Preprocessing** runs automatically after upload. Lambda splits video into 16-second chunks, normalizes images/PDFs. No action needed.
+- **Preprocessing** runs automatically after upload. Lambda splits video into 16-second chunks, normalizes images. No action needed.
 - **Indexing** you trigger explicitly. Credits are deducted upfront. Runs asynchronously.
 - **Search** returns timestamped video segments ranked by relevance.
 
@@ -58,7 +58,7 @@ Response:
 For Qwen3-VL collections, the response additionally includes:
 ```json
 {
-  "media_breakdown": {"video": 8, "image": 3, "pdf": 1},
+  "media_breakdown": {"video": 8, "image": 3},
   "total_media": 12,
   "media_ready": 12,
   "media_indexed": 0
@@ -176,7 +176,7 @@ Response:
 |---|---|---|
 | Video files | ✅ | ✅ |
 | Image files | ❌ — rejected with 400 | ✅ |
-| PDF files | ❌ — rejected with 400 | ✅ |
+| PDF files | ❌ — not supported | ❌ |
 | Vision search | ✅ | ✅ |
 | Audio/subtitle search | ✅ | ❌ |
 | Image-query search | ❌ | ✅ |

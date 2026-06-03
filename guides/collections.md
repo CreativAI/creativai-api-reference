@@ -9,9 +9,9 @@ Choose the model when creating the collection. **This cannot be changed later.**
 | Model | `model` param | Vector dimensions | Accepts |
 |---|---|---|---|
 | InternVideo2 (default) | `"default"` | 512 (vision) + 1024 (subtitles) | Video only |
-| Qwen3-VL | `"qwen"` | 4096 (unified multimodal) | Video, images, PDFs |
+| Multimodal | `"multimodal"` | 4096 (unified multimodal) | Video, images |
 
-Use `"qwen"` when you need to index images or PDFs, or want image-based search.
+Use `"multimodal"` when you need to index images or want image-based search.
 
 ---
 
@@ -203,7 +203,7 @@ curl -X PUT "$UPLOAD_URL" \
   --data-binary @lobby.mp4
 ```
 
-Supported content types: `video/mp4`, `video/quicktime`, `video/x-msvideo`, `image/jpeg`, `image/png`, `image/webp`, `application/pdf`.
+Supported content types: `video/mp4`, `video/quicktime`, `video/x-msvideo`, `image/jpeg`, `image/png`, `image/webp`.
 
 ### Batch Files
 
@@ -297,7 +297,7 @@ See [organizations-and-projects.md](organizations-and-projects.md) for how to st
 
 See [sharing-and-rbac.md](sharing-and-rbac.md) for inviting team members, managing roles, and per-plate access scoping.
 
-A **Collection** is the top-level container for your media (video, image, PDF). Every downstream operation — indexing, search, data plates, chat — is scoped to a collection.
+A **Collection** is the top-level container for your media (video, images). Every downstream operation — indexing, search, data plates, chat — is scoped to a collection.
 
 ---
 
@@ -344,7 +344,7 @@ Each collection is bound to one embedding model at creation time and cannot be c
 | Model | Value | Supports |
 |-------|-------|----------|
 | InternVideo2 | `"default"` | Video only |
-| Qwen3-VL | `"qwen"` | Video, images, PDFs |
+| Multimodal | `"multimodal"` | Video, images |
 
 ---
 

@@ -12,7 +12,7 @@ Your App
   ├── 1. Create Collection (choose embedding model)
   │
   ├── 2. Upload Media (presigned S3 URLs → direct upload)
-  │       Videos (.mp4, .mov, .avi), Images (.jpg, .png, .webp), PDFs
+  │       Videos (.mp4, .mov, .avi), Images (.jpg, .png, .webp)
   │
   ├── 3. Preprocessing (automatic Lambda, ~1–3 min/video)
   │
@@ -93,7 +93,7 @@ Collections are namespaced workspaces for your media. Choose the right embedding
 | Model | `model` value | Best For |
 |---|---|---|
 | InternVideo2 (default) | `"default"` | Video-only, 512-dim vision + 1024-dim subtitle vectors |
-| Qwen3-VL | `"qwen"` | Videos, images, PDFs — unified 4096-dim multimodal |
+| Multimodal | `"multimodal"` | Videos, images — unified 4096-dim multimodal |
 
 **Request body:**
 
@@ -148,7 +148,7 @@ echo "Collection ID: $COLLECTION_ID"
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `filename` | string | Yes | File name including extension |
-| `content_type` | string | Yes | MIME type (`video/mp4`, `image/jpeg`, `application/pdf`) |
+| `content_type` | string | Yes | MIME type (`video/mp4`, `image/jpeg`) |
 
 ```bash
 # 1. Request a presigned upload URL
@@ -259,7 +259,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/transfers" \
 
 ## Step 4 — Wait for Preprocessing
 
-After upload, a Lambda function automatically preprocesses media (splits video into 16-second chunks, normalizes images/PDFs). This runs in the background — no action needed.
+After upload, a Lambda function automatically preprocesses media (splits video into 16-second chunks, normalizes images). This runs in the background — no action needed.
 
 ```bash
 # Poll until preprocessing_status is "completed" or "partial"

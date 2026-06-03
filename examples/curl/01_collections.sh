@@ -42,15 +42,15 @@ COL_ID=$(echo "$COL" | json_field collection_id)
 echo "Collection ID: $COL_ID"
 
 echo "=== 6. Create collection (Qwen3-VL — multimodal) ==="
-QWEN_COL=$(curl -sf -X POST "$BASE/api/v2/collections" \
+MULTIMODAL_COL=$(curl -sf -X POST "$BASE/api/v2/collections" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d "{
-    \"collection_name\": \"demo-qwen3vl\",
-    \"description\": \"Multimodal collection for videos+images+PDFs\",
-    \"model\": \"qwen\"
+    \"collection_name\": \"demo-multimodal\",
+    \"description\": \"Multimodal collection for videos and images\",
+    \"model\": \"multimodal\"
   }")
-echo "$QWEN_COL" | python3 -m json.tool
-QWEN_COL_ID=$(echo "$QWEN_COL" | json_field collection_id)
+echo "$MULTIMODAL_COL" | python3 -m json.tool
+MULTIMODAL_COL_ID=$(echo "$MULTIMODAL_COL" | json_field collection_id)
 
 echo "=== 7. List all collections ==="
 curl -sf "$BASE/api/v2/collections" -H "X-API-Key: $KEY" | python3 -m json.tool

@@ -68,20 +68,20 @@ def workflow_index_and_search(video_files: list[Path], query: str):
     return results
 
 
-# ─── Workflow 2: Multimodal Collection with Qwen3-VL ─────────────────────────
+# ─── Workflow 2: Multimodal Collection ────────────────────────────────────────
 
-def workflow_qwen_multimodal(video_files: list[Path], image_files: list[Path]):
+def workflow_multimodal(video_files: list[Path], image_files: list[Path]):
     """
-    Qwen3-VL pipeline supporting videos, images, and PDFs in a single collection.
+    Multi-modal pipeline supporting videos and images in a single collection.
     """
-    print("=== Workflow 2: Qwen Multimodal ===\n")
+    print("=== Workflow 2: Multimodal ===\n")
 
     col = client.create_collection(
-        name="Qwen Multimodal Collection",
-        model="qwen",
+        name="Multimodal Collection",
+        model="multimodal",
     )
     cid = col["collection_id"]
-    print(f"Collection (Qwen3-VL): {cid}")
+    print(f"Collection (multimodal): {cid}")
 
     # Upload mixed media
     all_files = list(video_files) + list(image_files)
@@ -94,7 +94,7 @@ def workflow_qwen_multimodal(video_files: list[Path], image_files: list[Path]):
     idx = client.start_indexing(cid)
     client.wait_for_indexing(idx["indexing_id"])
 
-    # Image-based search (Qwen only)
+    # Image-based search (multi-modal collections only)
     if image_files:
         print("\nRunning image-based search using first image as query...")
         results = client.search_with_image_file(cid, image_files[0], top_k=5)
@@ -302,7 +302,7 @@ def workflow_live_stream(collection_id: str, camera_urls: list[dict]):
 
 def workflow_youtube_discovery(collection_id: str, search_query: str):
     """
-    Use Online Search to find YouTube videos and index them into a Qwen collection.
+    Use Online Search to find YouTube videos and index them into a multi-modal collection.
     """
     print("=== Workflow 6: YouTube Discovery ===\n")
 

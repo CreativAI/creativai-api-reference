@@ -24,7 +24,7 @@ CreativAI is a **Video Intelligence Platform** that lets you upload, index, sear
 | Detect suspicious activity and generate incident timelines | Public Safety & Security | Live Stream → Data Plates → Knowledge Extraction |
 | Auto-tag scenes, people, objects, and brand moments in archives | Media & Entertainment | Collections → Indexing → Search → Knowledge Extraction |
 | Analyze game footage for highlights and tactical patterns | Sports | Collections → Indexing → Search → Data Plates |
-| Query multi-modal datasets (videos, images, PDFs) in one workflow | Cross-Industry Operations | Collections → Indexing → Search → Agentic Chat |
+| Query multi-modal datasets (videos and images) in one workflow | Cross-Industry Operations | Collections → Indexing → Search → Agentic Chat |
 | Enrich collection insights with visual charts and summaries | Analytics & BI | Knowledge Extraction → Charts |
 
 ---
@@ -92,7 +92,7 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/me/info" \
 
 > **Scenario:** Upload a dashcam recording, index it, and search for moments where a pedestrian is visible.
 >
-> **Model choice:** `"default"` uses InternVideo2 (video only, fastest). Use `"qwen"` for Qwen3-VL if you need image queries or PDF support.
+> **Model choice:** CreativAI supports both video-only and multi-modal embedding models. See [collections.md](guides/collections.md) for detailed capability comparison.
 
 ```bash
 # 1. Create a collection (video-only model is fine for dashcam footage)
@@ -157,10 +157,10 @@ Authorization: Bearer <YOUR_API_KEY>
 
 CreativAI supports two embedding models. Choose when creating a collection — you cannot change the model afterwards.
 
-| `model` | Name | Supports | Best for |
-|---------|------|----------|----------|
-| `"default"` | InternVideo2 | Video frames, audio | CCTV, dashcam, general video search |
-| `"qwen"` | Qwen3-VL | Video + images + PDFs | Multi-modal analysis, YouTube content, document+video pipelines |
+| `model` | Supports | Best for |
+|---------|----------|----------|
+| `"default"` | Video frames, audio | CCTV, dashcam, general video search |
+| `"multimodal"` | Video + images | Multi-modal analysis, YouTube content, mixed media workflows |
 
 ### Response Envelope
 
@@ -252,7 +252,7 @@ Each guide covers one feature area in depth with request/response examples, fiel
 
 | Guide | What it covers | Real-world example |
 |-------|----------------|--------------------|
-| [collections.md](guides/collections.md) | Create collections (`default` InternVideo2 or `qwen` Qwen3-VL model), upload via presigned S3 URL, multipart upload for large files, transfer from existing S3 buckets | Ingest 500 GB of archival broadcast footage from an S3 bucket in a single transfer job |
+| [collections.md](guides/collections.md) | Create collections (video-only or multi-modal models), upload via presigned S3 URL, multipart upload for large files, transfer from existing S3 buckets | Ingest 500 GB of archival broadcast footage from an S3 bucket in a single transfer job |
 | [indexing-and-search.md](guides/indexing-and-search.md) | Start indexing jobs, poll status, estimate credit cost, semantic/visual/audio search, pagination, image-query search | "Find all moments a red Ferrari is visible" — visual search using an uploaded reference image |
 
 ### Analysis & Extraction

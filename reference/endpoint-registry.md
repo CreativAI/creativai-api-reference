@@ -89,7 +89,7 @@ Prefix: `/api/v2/collections`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/v2/collections` | Yes | Create collection (`model`: `"default"` or `"qwen"`) |
+| POST | `/api/v2/collections` | Yes | Create collection (video-only or multi-modal `model`) |
 | GET | `/api/v2/collections` | Yes | List collections (with pre-computed stats) |
 | POST | `/api/v2/collections/by-organization` | Yes | List collections by org |
 | POST | `/api/v2/collections/by-project` | Yes | List collections by project |
@@ -175,8 +175,8 @@ Prefix: `/api/v2/search`
 | `search_id` | string | No | Reuse previous search for pagination |
 | `video_urls` | list[string] | No | Restrict to specific S3 URIs |
 | `refine_query` | bool | No | LLM rewrites query for better recall |
-| `image_base64` | string | No | Base64 image for visual query (Qwen only) |
-| `image_key` | string | No | S3 key of uploaded image (Qwen only, preferred) |
+| `image_base64` | string | No | Base64 image for visual query (multi-modal collections) |
+| `image_key` | string | No | S3 key of uploaded image (multi-modal collections, preferred) |
 
 ---
 
@@ -363,7 +363,7 @@ Prefix: `/api/v2/live-stream`
 | DELETE | `/api/v2/live-stream/sessions/{session_id}` | Yes | Delete session permanently |
 | POST | `/api/v2/live-stream/sessions/{session_id}/add-questions` | Yes | Add/update live analysis questions |
 | GET | `/api/v2/live-stream/sessions/{session_id}/indexing-jobs` | Yes | Get current indexing status |
-| GET | `/api/v2/live-stream/sessions/{session_id}/worker-status` | Yes | Poll Qwen worker readiness |
+| GET | `/api/v2/live-stream/sessions/{session_id}/worker-status` | Yes | Poll embedding worker readiness |
 | GET | `/api/v2/live-stream/sessions/{session_id}/mediamtx-status` | Yes | Poll MediaMTX readiness |
 
 ### Protocol-Specific Streams
@@ -406,7 +406,7 @@ Prefix: `/api/v2/live-stream`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/v2/live-stream/internal/live-plate-updated` | Internal | Live Qwen worker notifies new extracted_info |
+| POST | `/api/v2/live-stream/internal/live-plate-updated` | Internal | Embedding worker notifies new extracted_info |
 | POST | `/api/v2/live-stream/internal/segment-recorded` | Internal | Segment uploaded to S3 by MediaMTX |
 | POST | `/api/v2/live-stream/internal/stream-ready` | Internal | Publisher connected |
 | POST | `/api/v2/live-stream/internal/stream-not-ready` | Internal | Publisher disconnected |

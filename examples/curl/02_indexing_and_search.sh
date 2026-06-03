@@ -113,7 +113,7 @@ curl -sf -X POST "$BASE/api/v2/search" \
     \"top_k\": 5
   }" | python3 -m json.tool
 
-echo "=== 10. Image-based search (Qwen collections only) ==="
+echo "=== 10. Image-based search (multi-modal collections) ==="
 # Encode a reference image and use it as the search query
 if command -v base64 &>/dev/null && [ -f sample_query.jpg ]; then
   IMG_B64=$(base64 -i sample_query.jpg)
