@@ -475,7 +475,7 @@ Prefix: `/api/v2/users`
 | GET | `/api/v2/users/me` | Yes | Get current user ID |
 | GET | `/api/v2/users/me/uploaded-hours` | Yes | Total uploaded hours + storage |
 | GET | `/api/v2/users/me/info` | Yes | Credits, hours, search requests |
-| GET | `/api/v2/users/get_users_info` | Yes | Get account info (legacy alias) |
+| GET | `/api/v2/users/get_users_info` | Yes | Get account info (active alias used by the web app) |
 | GET | `/api/v2/users/api-key-check` | Yes | Validate API key for authenticated caller |
 | GET | `/api/v2/users/api-key-check/{user_id_param}` | Yes | Validate API key for explicit user ID (admin/internal use) |
 | POST | `/api/v2/users/credits/claim-welcome` | Yes | Claim one-time welcome credits |

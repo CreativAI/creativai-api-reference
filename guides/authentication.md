@@ -6,7 +6,7 @@ All API calls (except public endpoints like `/health`) require an API key.
 
 ### 1. Create an Account
 
-Sign up at **[creativ-ai.com](https://creativ-ai.com)**. After email verification you will land on the Dashboard with a free-tier plan active and welcome credits already applied.
+Sign up at **[creativ-ai.com](https://creativ-ai.com)**. After email verification you will land on the **collections page (`/`)** with a free-tier plan active and welcome credits already applied.
 
 ### 2. Copy Your API Key
 
@@ -29,6 +29,25 @@ export CREATIVAI_API_KEY="<YOUR_API_KEY>"
 ```
 
 ### 4. Verify the Key
+
+The web app uses `POST /api/v2/api-keys` (Firebase Bearer token) to get or create your API key:
+
+```bash
+# Get existing key
+curl "$CREATIVAI_BASE_URL/api/v2/api-keys" \
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
+
+# Create key if missing (idempotent)
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/api-keys" \
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
+```
+
+**Response:**
+```json
+{ "api_key": "sk_live_xxx" }
+```
+
+To validate an existing API key using the key itself:
 
 ```bash
 curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
@@ -64,9 +83,9 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
 
 ## Manage API Keys
 
-### Get Existing Key (Dashboard Clients)
+### Get Existing Key (Web App / Firebase Clients)
 
-`/api/v2/api-keys` endpoints are intended for authenticated dashboard clients and require a Firebase ID token in `Authorization: Bearer <token>`.
+`/api/v2/api-keys` endpoints are intended for authenticated web app clients and require a Firebase ID token in `Authorization: Bearer <token>`.
 
 ```bash
 curl "$CREATIVAI_BASE_URL/api/v2/api-keys" \
@@ -84,7 +103,7 @@ If no key exists yet:
 { "api_key": null }
 ```
 
-### Create Key If Missing (Dashboard Clients)
+### Create Key If Missing (Web App / Firebase Clients)
 
 ```bash
 curl -X POST "$CREATIVAI_BASE_URL/api/v2/api-keys" \
@@ -132,7 +151,7 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/me" \
 ### Example: Get Account Info (Credits, Usage)
 
 ```bash
-curl "$CREATIVAI_BASE_URL/api/v2/users/me/info" \
+curl "$CREATIVAI_BASE_URL/api/v2/users/get_users_info" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
 ```
 
@@ -242,7 +261,7 @@ Do not use this form for non-browser clients.
 - **Never embed API keys** in frontend JavaScript, mobile app binaries, or any client-side code
 - **Store keys in environment variables** or a secrets manager (AWS Secrets Manager, HashiCorp Vault, GCP Secret Manager)
 - **One key per environment** — maintain separate keys for development, staging, and production
-- **Rotate keys periodically** — generate/replace keys from the dashboard key manager
-- **Revoke compromised keys immediately** — use the dashboard key manager
+- **Rotate keys periodically** — generate/replace keys from the profile dropdown
+- **Revoke compromised keys immediately** — use the profile dropdown key manager
 - **HTTPS only** — the API does not accept HTTP connections
 - **Use least-privilege roles** — share collections with the minimum role needed; prefer `read_only` for consumers

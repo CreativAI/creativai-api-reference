@@ -31,13 +31,13 @@ CreativAI is a **Video Intelligence Platform** that lets you upload, index, sear
 
 ## Step 0 — Get Your API Key
 
-Before making any API call you need an API key. Keys are created from the CreativAI dashboard.
+Before making any API call you need an API key. Keys are created from the CreativAI app.
 
 ### Sign Up / Log In
 
 1. Go to **[creativ-ai.com](https://creativ-ai.com)** and create an account (or log in).
 2. Verify your email address.
-3. You will land on the **Dashboard** with a free-tier plan active and welcome credits applied.
+3. You will land on the **collections page (`/`)** with a free-tier plan active and welcome credits applied.
 
 ### Find Your API Key
 
@@ -53,7 +53,7 @@ Your API key is **automatically provisioned** when you sign up — there is noth
 
 ```bash
 # Programmatic key retrieval/creation uses Firebase ID token auth,
-# not X-API-Key. This is intended for authenticated dashboard clients.
+# not X-API-Key. This is intended for authenticated web app clients.
 export CREATIVAI_BASE_URL="https://creativai-apis.com"
 export FIREBASE_ID_TOKEN="<FIREBASE_ID_TOKEN>"
 
@@ -83,7 +83,7 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
 # → {"success": true, "data": {"valid": true}}
 
 # Check your credit balance before starting
-curl "$CREATIVAI_BASE_URL/api/v2/users/me/info" \
+curl "$CREATIVAI_BASE_URL/api/v2/users/get_users_info" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
 # → {"data": {"credits_remaining": 5000, "uploaded_hours": 0, ...}}
 ```

@@ -13,7 +13,7 @@ echo "=== 1. Verify authentication ==="
 curl -sf "$BASE/api/v2/users/api-key-check" -H "X-API-Key: $KEY" | python3 -m json.tool
 
 echo "=== 2. Get user info ==="
-curl -sf "$BASE/api/v2/users/me/info" -H "X-API-Key: $KEY" | python3 -m json.tool
+curl -sf "$BASE/api/v2/users/get_users_info" -H "X-API-Key: $KEY" | python3 -m json.tool
 
 # ─── Organizations & Projects ─────────────────────────────────────────────────
 echo "=== 3. Create organization ==="

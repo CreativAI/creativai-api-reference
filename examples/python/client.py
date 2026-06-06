@@ -73,7 +73,7 @@ class CreativAIClient:
         return self._data(self._get("users/api-key-check"))
 
     def get_me(self) -> dict:
-        return self._data(self._get("users/me/info"))
+        return self._data(self._get("users/get_users_info"))
 
     # ─── Collections ─────────────────────────────────────────────────────────
 

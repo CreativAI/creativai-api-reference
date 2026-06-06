@@ -7,7 +7,7 @@ This guide walks you through the complete CreativAI workflow — from first API 
 ```
 Your App
   │
-  ├── 0. Get API Key (dashboard → Settings → API Keys)
+  ├── 0. Get API Key (app → profile dropdown → API Key)
   │
   ├── 1. Create Collection (choose embedding model)
   │
@@ -49,6 +49,25 @@ See [authentication.md](authentication.md) for full key management (create, list
 
 ## Step 1 — Verify Authentication
 
+The web app (and programmatic clients using Firebase) retrieves or creates your API key via:
+
+```bash
+# Get existing key (or null if none)
+curl "$CREATIVAI_BASE_URL/api/v2/api-keys" \
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
+
+# Create key if missing (idempotent — returns existing key if already created)
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/api-keys" \
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
+```
+
+**Response:**
+```json
+{ "api_key": "sk_live_xxx" }
+```
+
+Once you have your API key, validate it is active:
+
 ```bash
 curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
@@ -66,7 +85,7 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
 Get your account info (credits, usage):
 
 ```bash
-curl "$CREATIVAI_BASE_URL/api/v2/users/me/info" \
+curl "$CREATIVAI_BASE_URL/api/v2/users/get_users_info" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
 ```
 
