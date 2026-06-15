@@ -90,9 +90,9 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/get_users_info" \
 
 ### First Workflow in 5 Commands
 
-> **Scenario:** Upload a dashcam recording, index it, and search for moments where a pedestrian is visible.
+> **Scenario:** Import a dashcam recording from Google Drive, index it, and search for moments where a pedestrian is visible.
 >
-> **Model choice:** CreativAI supports both video-only and multi-modal embedding models. See [collections.md](guides/collections.md) for detailed capability comparison.
+> **No local upload required** — the backend fetches the file directly from Google Drive into your collection.
 
 ```bash
 # 1. Create a collection (video-only model is fine for dashcam footage)
@@ -102,24 +102,25 @@ COLLECTION_ID=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v2/collections" \
   -d '{"collection_name": "dashcam-trip-2026-05", "model": "default"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['collection_id'])")
 
-# 2. Get a presigned S3 upload URL (no API key sent to S3)
-UPLOAD_URL=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v2/collections/$COLLECTION_ID/upload-url" \
+# 2. Transfer file from Google Drive (replace GOOGLE_ACCESS_TOKEN and FILE_ID with real values)
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/upload/google-drive/transfer" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"filename": "trip.mp4", "content_type": "video/mp4"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['upload_url'])")
+  -d "{
+    \"collection_id\": \"$COLLECTION_ID\",
+    \"access_token\": \"$GOOGLE_ACCESS_TOKEN\",
+    \"file_ids\": [\"$DRIVE_FILE_ID\"],
+    \"file_names\": [\"trip.mp4\"]
+  }"
 
-# 3. Upload directly to S3 (no API key required on this PUT)
-curl -X PUT "$UPLOAD_URL" -H "Content-Type: video/mp4" --data-binary @trip.mp4
-
-# 4. Start indexing (async — returns a job ID immediately)
+# 3. Start indexing (async — returns a job ID immediately)
 INDEXING_ID=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v2/indexing/chunk-based" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d "{\"collection_id\": \"$COLLECTION_ID\"}" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['indexing_id'])")
 
-# Poll until completed (takes ~1–3 min per hour of video)
+# 4. Poll until indexing is complete (takes ~1–3 min per hour of video)
 while true; do
   STATUS=$(curl -s "$CREATIVAI_BASE_URL/api/v2/indexing/chunk-based/$INDEXING_ID/status" \
     -H "X-API-Key: $CREATIVAI_API_KEY" \
@@ -135,6 +136,8 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/search" \
   -H "Content-Type: application/json" \
   -d "{\"collection_id\": \"$COLLECTION_ID\", \"text_query\": \"pedestrian crossing road\", \"search_type\": \"hybrid\"}"
 ```
+
+> Also works with Dropbox (`POST /api/v2/upload/dropbox/transfer`) and Hugging Face (`POST /api/v2/upload/huggingface/transfer`). See [upload-integrations.md](guides/upload-integrations.md) for the full OAuth setup for each provider.
 
 ---
 
@@ -252,16 +255,17 @@ Each guide covers one feature area in depth with request/response examples, fiel
 
 | Guide | What it covers | Real-world example |
 |-------|----------------|--------------------|
-| [collections.md](guides/collections.md) | Create collections (video-only or multi-modal models), upload via presigned S3 URL, multipart upload for large files, transfer from existing S3 buckets | Ingest 500 GB of archival broadcast footage from an S3 bucket in a single transfer job |
+| [upload-integrations.md](guides/upload-integrations.md) | Import media from Google Drive, Dropbox, and Hugging Face without local download; OAuth setup, list endpoints, transfer endpoints, per-file results | User selects 20 videos from their Google Drive; backend transfers them directly into the collection without the browser ever touching the file bytes |
+| [collections.md](guides/collections.md) | Create collections (video-only or multi-modal models), presigned S3 upload URL for direct upload, multipart upload for large files, transfer from existing S3 buckets | Ingest 500 GB of archival broadcast footage from an S3 bucket in a single transfer job |
 | [indexing-and-search.md](guides/indexing-and-search.md) | Start indexing jobs, poll status, estimate credit cost, semantic/visual/audio search, pagination, image-query search | "Find all moments a red Ferrari is visible" — visual search using an uploaded reference image |
 
 ### Analysis & Extraction
 
 | Guide | What it covers | Real-world example |
 |-------|----------------|--------------------|
-| [data-plates.md](guides/data-plates.md) | Create a plate from search results or an entire collection, manage segments, add/remove columns, run verification workflows via sub-plates, export to CSV | Create a plate of all "near-miss" incidents from warehouse footage, assign segments to a safety review team |
-| [knowledge-extraction.md](guides/knowledge-extraction.md) | Add AI extraction columns (questions answered per-segment), poll jobs, chat with plate data, auto-generated charts on `/api/v2/knowledge-extraction/...` | Ask "Is the worker wearing a hard hat?" across 2,000 segments; export a compliance report |
-| [agentic-chat.md](guides/agentic-chat.md) | SSE streaming AI agent, multi-step search planning, interrupts (search feedback, YouTube candidates), stop/resume, reconnect after disconnect | "Summarise all camera angles that show a vehicle entering between 2 AM and 4 AM and compare to last week" — agent searches, synthesises, and cites clips |
+| [data-plates.md](guides/data-plates.md) | Create plates from search results or full collections, manage segments, filter by extracted column values, split work across annotators with sub-plates (`segment_wise` / `filter` / `column_wise`), export to CSV | Create a plate of all "near-miss" incidents from warehouse footage; apply filter `"Is PPE worn?": "No"` to isolate violations; auto-distribute the 800 matches across 4 annotators |
+| [knowledge-extraction.md](guides/knowledge-extraction.md) | Add AI extraction columns (questions answered per-segment), multi-question batch jobs, reference images, chat with plate data, auto-generated charts | Ask "Is the worker wearing a hard hat?" across 2,000 segments; export a compliance report; chat: "Which camera angle has the highest violation rate?" |
+| [agentic-chat.md](guides/agentic-chat.md) | SSE streaming AI agent, multi-step search planning, execution plan events, interrupts (search feedback, YouTube candidates), stop/resume, reconnect after disconnect | "Summarise all camera angles that show a vehicle entering between 2 AM and 4 AM and compare to last week" — agent searches, synthesises, and cites clips |
 
 ### Live & Online Video
 

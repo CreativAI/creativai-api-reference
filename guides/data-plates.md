@@ -5,7 +5,21 @@ Data plates are curated, named sets of video segments — the foundation for all
 ## Concept
 
 ```
-Search Results → Data Plate → Knowledge Extraction (AI columns) → Insights
+Collection (indexed videos)
+      │
+      ├── Search  ──────────────────────────────────────────►  search_id
+      │
+      ├── Data Plate  ◄── search_id (or full collection)
+      │       │
+      │       ├── Segments  (rows: video clips with start/end timestamps)
+      │       │
+      │       ├── Columns  (AI-extracted answers per segment via Knowledge Extraction)
+      │       │
+      │       ├── Filters  (slice by any column value at read time)
+      │       │
+      │       └── Sub-Plates  (split work across annotators for verification)
+      │
+      └── Knowledge Extraction ──────────► AI answers → structured table → CSV export
 ```
 
 A plate stores:
@@ -98,9 +112,16 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/get" \
   }'
 ```
 
-Filter segments by extracted column values:
+Response includes `can_write` (based on caller role) and a paginated `segments` array.
+
+---
+
+## Filtering Segments by Extracted Column Values
+
+After Knowledge Extraction has populated columns (e.g. "Is anyone wearing a safety vest?"), you can filter the plate at read time to only see segments matching specific answers. Filters are **case-insensitive substring matches** and can combine multiple columns.
 
 ```bash
+# Show only segments where no safety vest is worn AND exactly 2 people are visible
 curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/get" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
@@ -110,13 +131,34 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/get" \
     "page": 1,
     "page_size": 50,
     "filters": {
-      "How many people are visible?": "2",
-      "Is the person wearing a uniform?": "Yes"
+      "Is anyone wearing a safety vest?": "No",
+      "How many people are visible?": "2"
     }
   }'
 ```
 
-Filters are case-insensitive substring matches. Response includes `can_write` based on caller role.
+```bash
+# Show only segments where environment is "outdoor"
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/get" \
+  -H "X-API-Key: $CREATIVAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "collection_id": "'$COLLECTION_ID'",
+    "plate_id": "'$PLATE_ID'",
+    "page": 1,
+    "page_size": 50,
+    "filters": {
+      "Describe the environment": "outdoor"
+    }
+  }'
+```
+
+**Key points about filters:**
+- The filter key is the **exact question text** used when the column was created via Knowledge Extraction
+- The filter value is matched as a **case-insensitive substring** (e.g. `"No"` matches `"No"`, `"no"`, `"None"`)
+- Multiple filters are combined with **AND** logic
+- Filters only apply to columns that have been extracted — unextracted columns are ignored
+- Filtered results respect the same pagination (`page`, `page_size`) as unfiltered requests
 
 ---
 
@@ -260,9 +302,26 @@ curl -O -J "$CREATIVAI_BASE_URL/api/v2/data-plates/export-csv/$COLLECTION_ID/$PL
 
 > Use `/api/v2/data-plates/sub-plates/...` for all sub-plate operations.
 
-Sub-plates are child plates for splitting annotation work across a team.
+Sub-plates are child plates created from a parent plate to split annotation or verification work across a team. Each sub-plate contains a subset of the parent's segments.
 
-### Create Sub-Plate
+### Why Sub-Plates?
+
+When a plate contains thousands of segments, a single annotator cannot review everything efficiently. Sub-plates allow you to:
+
+- Split segments equally across multiple annotators
+- Assign specific column questions to specific team members
+- Filter by extracted values to route edge-cases to specialists
+- Track individual verification progress per sub-plate
+
+**Sub-plate modes:**
+
+| Mode | Description | Use When |
+|---|---|---|
+| `"filter"` | Filtered subset of parent segments based on column values | Route anomalies to specialists |
+| `"segment_wise"` | A contiguous slice of the parent's segment index range | Split evenly across annotators |
+| `"column_wise"` | Specific columns assigned for annotation | Different experts handle different questions |
+
+### Create a Sub-Plate Manually
 
 ```bash
 curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/sub-plates/create" \
@@ -278,42 +337,9 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/sub-plates/create" \
   }'
 ```
 
-Sub-plate modes:
-| Mode | Description |
-|---|---|
-| `"filter"` | Filtered subset of parent segments |
-| `"segment_wise"` | Specific slice of segment indices (for even splitting across teams) |
-| `"column_wise"` | Specific columns assigned for annotation |
+### Auto-Distribute (Recommended for Team Workflows)
 
-### Verify a Segment
-
-```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/sub-plates/verify" \
-  -H "X-API-Key: $CREATIVAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "collection_id": "'$COLLECTION_ID'",
-    "sub_plate_id": "'$SUB_PLATE_ID'",
-    "segment_id": "seg_abc123",
-    "status": "verified",
-    "notes": "Confirmed 3 people"
-  }'
-```
-
-`status`: `"verified"` | `"flagged"` | `"pending"`
-
-### Check Verification Progress
-
-```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/sub-plates/verification-progress" \
-  -H "X-API-Key: $CREATIVAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"collection_id": "'$COLLECTION_ID'", "sub_plate_id": "'$SUB_PLATE_ID'"}'
-```
-
-### Auto-Distribute
-
-Atomically create a verification task, split the plate, and assign sub-plates to annotators:
+Creates a verification task, splits the parent plate, and assigns sub-plates to annotators — all in one atomic operation:
 
 ```bash
 curl -X POST "$CREATIVAI_BASE_URL/api/v2/tasks/auto-distribute" \
@@ -328,6 +354,42 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/tasks/auto-distribute" \
     "assignees": ["user_alice", "user_bob", "user_charlie"]
   }'
 ```
+
+This creates three sub-plates, each containing ~⅓ of the parent plate's segments, assigns them to the three users, creates a tracking task, and sends FCM push notifications to all assignees.
+
+### Verify a Segment
+
+Annotators mark segments as verified, flagged, or pending. This updates the sub-plate's verification progress.
+
+```bash
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/sub-plates/verify" \
+  -H "X-API-Key: $CREATIVAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "collection_id": "'$COLLECTION_ID'",
+    "sub_plate_id": "'$SUB_PLATE_ID'",
+    "segment_id": "seg_abc123",
+    "status": "verified",
+    "notes": "Confirmed 3 people, no PPE worn"
+  }'
+```
+
+| `status` value | Meaning |
+|---|---|
+| `"verified"` | Segment reviewed and confirmed |
+| `"flagged"` | Segment needs follow-up or escalation |
+| `"pending"` | Not yet reviewed (default) |
+
+### Check Verification Progress
+
+```bash
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/data-plates/sub-plates/verification-progress" \
+  -H "X-API-Key: $CREATIVAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"collection_id": "'$COLLECTION_ID'", "sub_plate_id": "'$SUB_PLATE_ID'"}'
+```
+
+Returns counts of `verified`, `flagged`, `pending` segments and an overall `progress` percentage.
 
 ---
 
