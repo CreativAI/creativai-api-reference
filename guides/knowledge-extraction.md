@@ -115,6 +115,39 @@ Response:
 
 ---
 
+## Cancel an Extraction Job
+
+Use the unified job cancellation endpoint to stop a running KE job:
+
+```bash
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/jobs/cancel" \
+  -H "X-API-Key: $CREATIVAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_type": "knowledge-extraction",
+    "job_id": "'$JOB_ID'"
+  }'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "job_id": "ke_job_xxxxxxxxxx",
+    "job_type": "knowledge-extraction",
+    "status": "cancelled",
+    "messages_removed": 12
+  }
+}
+```
+
+`messages_removed` is the number of pending segment-level messages removed from the queue. Segments already processed retain their extracted values. The column still appears in the plate with partial results — you can re-run extraction later to fill in the gaps.
+
+**Errors**: `400` for an unknown `job_type`, `403` if the job belongs to another user, `404` if the job does not exist.
+
+---
+
 ## List Columns in a Plate
 
 ```bash

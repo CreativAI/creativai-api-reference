@@ -27,6 +27,7 @@
 | Knowledge Extraction | 8 | v2 |
 | Chat (Plate Sessions) | 5 | |
 | Agentic Chat | 12 | SSE streaming |
+| Jobs | 1 | Unified job cancellation |
 | Collection Sharing & RBAC | 25 | |
 | Collection Tasks | 12 | |
 | Live Stream — Sessions | 10 | `video_only` / `multimodal` models |
@@ -42,7 +43,7 @@
 | Subscriptions | 14 | |
 | Invoices | 3 | |
 | Admin Dashboard | 12 | Admin only |
-| **Total** | **~235** | |
+| **Total** | **~236** | |
 
 ---
 
@@ -277,7 +278,39 @@ Prefix: `/api/v2/agentic-chat`
 
 ---
 
-## 15. Collection Sharing & RBAC
+## 15. Jobs
+
+Prefix: `/api/v2/jobs`
+
+A unified endpoint to cancel any running async job by removing its pending messages from the processing queue.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v2/jobs/cancel` | Yes | Cancel a running indexing, KE, or live-stream job |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `job_type` | string | Yes | `"indexing-chunk"`, `"indexing-qwen"`, `"indexing-youtube"`, `"knowledge-extraction"`, or `"live-stream"` |
+| `job_id` | string | Yes | The job identifier (e.g. `idx_xxx`, `ke_job_xxx`) |
+
+**Response `data`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `job_id` | string | The cancelled job ID |
+| `job_type` | string | The job type that was cancelled |
+| `status` | string | Always `"cancelled"` |
+| `messages_removed` | int | Number of pending queue messages purged |
+
+**Errors:** `400` unknown `job_type` · `403` caller does not own the job · `404` job not found
+
+> Cancellation is queue-based — pending work is purged. Work already in-flight may still complete. For indexing, credits are only charged for chunks that were fully processed before cancellation.
+
+---
+
+## 16. Collection Sharing & RBAC
 
 Prefix: `/api/v2/sharing`
 
@@ -326,7 +359,7 @@ Prefix: `/api/v2/sharing`
 
 ---
 
-## 16. Collection Tasks
+## 17. Collection Tasks
 
 Prefix: `/api/v2/tasks`
 
@@ -347,7 +380,7 @@ Prefix: `/api/v2/tasks`
 
 ---
 
-## 17. Live Stream
+## 18. Live Stream
 
 Prefix: `/api/v2/live-stream`
 
@@ -417,7 +450,7 @@ All endpoints accept: `collection_name` or `collection_id`, `name`, `user_query`
 
 ---
 
-## 18. Online Search
+## 19. Online Search
 
 Prefix: `/api/v2/online-search`
 
@@ -432,7 +465,7 @@ Prefix: `/api/v2/online-search`
 
 ---
 
-## 19. YouTube Search
+## 20. YouTube Search
 
 > **Use `/api/v2/yt-search-v2/`** — this is the latest version. V1 (`/api/v2/yt-search/`) is legacy.
 
@@ -452,7 +485,7 @@ Prefix: `/api/v2/yt-search-v2`
 
 ---
 
-## 20. Transactions
+## 21. Transactions
 
 Prefix: `/api/v2/transactions`
 
@@ -470,7 +503,7 @@ Prefix: `/api/v2/transactions`
 
 ---
 
-## 21. Users
+## 22. Users
 
 Prefix: `/api/v2/users`
 
@@ -488,7 +521,7 @@ Prefix: `/api/v2/users`
 
 ---
 
-## 22. Payments
+## 23. Payments
 
 Prefix: `/api/v2/payments`
 
@@ -500,7 +533,7 @@ Prefix: `/api/v2/payments`
 
 ---
 
-## 23. Subscriptions
+## 24. Subscriptions
 
 Prefix: `/api/v2/subscriptions`
 
@@ -519,7 +552,7 @@ Prefix: `/api/v2/subscriptions`
 
 ---
 
-## 24. Invoices
+## 25. Invoices
 
 Prefix: `/api/v2/invoices`
 
@@ -531,7 +564,7 @@ Prefix: `/api/v2/invoices`
 
 ---
 
-## 25. Admin Dashboard
+## 26. Admin Dashboard
 
 > These endpoints require admin-level access and are not available to regular API keys.
 
@@ -554,7 +587,7 @@ Prefix: `/api/v2/admin/dashboard`
 
 ---
 
-## 26. Help Menu
+## 27. Help Menu
 
 Prefix: `/api/v2/help`
 
@@ -565,7 +598,7 @@ Prefix: `/api/v2/help`
 
 ---
 
-## 27. Miscellaneous
+## 28. Miscellaneous
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|

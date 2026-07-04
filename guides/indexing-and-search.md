@@ -170,6 +170,45 @@ Response:
 
 **Status values**: `initiated` → `processing` → `completed` / `failed` / `partial`
 
+### Cancel an Indexing Job
+
+Use the unified job cancellation endpoint to stop a running indexing job:
+
+```bash
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/jobs/cancel" \
+  -H "X-API-Key: $CREATIVAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_type": "indexing-chunk",
+    "job_id": "'$INDEXING_ID'"
+  }'
+```
+
+| `job_type` | When to use |
+|---|---|
+| `"indexing-chunk"` | Standard `video_only` or `multimodal` indexing job |
+| `"indexing-qwen"` | Qwen3-VL indexing job |
+| `"indexing-youtube"` | YouTube video indexing job (triggered via YouTube Search) |
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "job_id": "idx_xxxxxxxxxx",
+    "job_type": "indexing-chunk",
+    "status": "cancelled",
+    "messages_removed": 48
+  }
+}
+```
+
+`messages_removed` is the number of pending queue messages purged. Cancellation removes unprocessed chunks from the queue; any chunks already indexed remain in the collection. Credits are only deducted for work that was completed before cancellation.
+
+> Cancellation is queue-based. A chunk that has already started processing may still finish before the cancellation takes effect.
+
+**Errors**: `400` for an unknown `job_type`, `403` if the job belongs to another user, `404` if the job does not exist.
+
 ### Model Constraints
 
 | Capability | `video_only` (default) | `multimodal` |

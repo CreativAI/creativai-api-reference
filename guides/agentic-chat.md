@@ -250,6 +250,43 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/agentic-chat/sessions/$SESSION_ID/stop"
 
 Gracefully stops after the current step completes. The session state becomes `interrupted` and can be resumed later.
 
+### Blocked stop — active KE or indexing jobs
+
+If the agent is currently running Knowledge Extraction or YouTube indexing sub-jobs, the stop request returns a `blocked` response instead of stopping immediately:
+
+```json
+{
+  "success": true,
+  "data": {
+    "session_id": "sess_xxx",
+    "status": "blocked",
+    "reason": "Cannot stop while Knowledge Extraction jobs are running.",
+    "active_ke_jobs": [
+      {"job_id": "ke_job_xxx", "status": "running", "question": "How many people are visible?"}
+    ],
+    "running_job_count": 1
+  }
+}
+```
+
+To force-cancel the underlying jobs first, use the unified job cancellation endpoint:
+
+```bash
+# Cancel a running KE job
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/jobs/cancel" \
+  -H "X-API-Key: $CREATIVAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"job_type": "knowledge-extraction", "job_id": "'$KE_JOB_ID'"}'
+
+# Cancel a YouTube indexing job
+curl -X POST "$CREATIVAI_BASE_URL/api/v2/jobs/cancel" \
+  -H "X-API-Key: $CREATIVAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"job_type": "indexing-youtube", "job_id": "'$INDEXING_JOB_ID'"}'
+```
+
+After the sub-jobs are cancelled, re-send the stop request.
+
 ---
 
 ## Check Agent Status
