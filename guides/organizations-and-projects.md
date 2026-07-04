@@ -243,7 +243,7 @@ requests.post(f"{BASE}/api/v2/organizations/{org_id}/projects",
 # Create collection inside project
 col = requests.post(f"{BASE}/api/v2/collections", headers=headers, json={
     "collection_name": "Launch Videos",
-    "model": "default",
+    "model": "video_only",
     "organization_id": org_id,
     "project_name": "Launch 2026",
 }).json()

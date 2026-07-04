@@ -155,7 +155,7 @@ Response:
     "indexing_id": "idx_xxxxxxxxxx",
     "collection_id": "col_xxx",
     "status": "completed",
-    "model": "internvideo2",
+    "model": "video_only",
     "total_videos": 12,
     "processed_videos": 12,
     "failed_videos": 0,
@@ -172,7 +172,7 @@ Response:
 
 ### Model Constraints
 
-| Capability | `internvideo2` (default) | `qwen3-vl` |
+| Capability | `video_only` (default) | `multimodal` |
 |---|---|---|
 | Video files | ✅ | ✅ |
 | Image files | ❌ — rejected with 400 | ✅ |

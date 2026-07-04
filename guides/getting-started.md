@@ -125,7 +125,7 @@ Collections are namespaced workspaces for your media. Choose the right embedding
 
 | Model | `model` value | Best For |
 |---|---|---|
-| InternVideo2 (default) | `"default"` | Video-only, 512-dim vision + 1024-dim subtitle vectors |
+| Video-Only (default) | `"video_only"` | Video-only, 512-dim vision + 1024-dim subtitle vectors |
 | Multimodal | `"multimodal"` | Videos, images — unified 4096-dim multimodal |
 
 **Request body:**
@@ -134,7 +134,7 @@ Collections are namespaced workspaces for your media. Choose the right embedding
 |-------|------|----------|-------------|
 | `collection_name` | string | Yes | Unique name for this collection |
 | `description` | string | No | Human-readable description |
-| `model` | string | No | `"default"` (InternVideo2) or `"qwen"` (Qwen3-VL). Default: `"default"` |
+| `model` | string | No | `"video_only"` (Video-Only) or `"multimodal"` (Multimodal). Default: `"video_only"` |
 | `organization_id` | string | No | Scope the collection to an org |
 | `project_name` | string | No | Scope the collection to a project within the org |
 
@@ -145,7 +145,7 @@ RESPONSE=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v2/collections" \
   -d '{
     "collection_name": "my-first-collection",
     "description": "Getting started test collection",
-    "model": "default"
+    "model": "video_only"
   }')
 
 COLLECTION_ID=$(echo $RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['collection_id'])")
@@ -160,7 +160,7 @@ echo "Collection ID: $COLLECTION_ID"
     "collection_id": "my-first-collection_a1b2c3d4",
     "collection_name": "my-first-collection",
     "description": "Getting started test collection",
-    "model": "internvideo2",
+    "model": "video_only",
     "status": "active",
     "organization_id": "org_abc123",
     "project_name": "Default Project",

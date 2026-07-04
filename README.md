@@ -99,7 +99,7 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/get_users_info" \
 COLLECTION_ID=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v2/collections" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"collection_name": "dashcam-trip-2026-05", "model": "default"}' \
+  -d '{"collection_name": "dashcam-trip-2026-05", "model": "video_only"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['collection_id'])")
 
 # 2. Transfer file from Google Drive (replace GOOGLE_ACCESS_TOKEN and FILE_ID with real values)
@@ -162,7 +162,7 @@ CreativAI supports two embedding models. Choose when creating a collection — y
 
 | `model` | Supports | Best for |
 |---------|----------|----------|
-| `"default"` | Video frames, audio | CCTV, dashcam, general video search |
+| `"video_only"` (default) | Video frames, audio/subtitles | CCTV, dashcam, general video search |
 | `"multimodal"` | Video + images | Multi-modal analysis, YouTube content, mixed media workflows |
 
 ### Response Envelope

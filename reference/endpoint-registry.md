@@ -1,6 +1,6 @@
 # CreativAI API — Complete Endpoint Registry
 
-> Last updated: 2026-05-26  
+> Last updated: 2026-07-04  
 > This document is published as integration reference and intentionally excludes backend implementation details.  
 > **Version policy:** Use `/api/v2/` for all client integrations. Some deployments still expose `/api/v3/` aliases for backward compatibility.  
 > **Base URL:** `https://creativai-apis.com`  
@@ -29,7 +29,7 @@
 | Agentic Chat | 12 | SSE streaming |
 | Collection Sharing & RBAC | 25 | |
 | Collection Tasks | 12 | |
-| Live Stream — Sessions | 10 | |
+| Live Stream — Sessions | 10 | `video_only` / `multimodal` models |
 | Live Stream — Protocol Streams | 7 | |
 | Live Stream — MediaMTX | 6 | |
 | Live Stream — Internal Webhooks | 4 | Internal only |
@@ -353,63 +353,67 @@ Prefix: `/api/v2/live-stream`
 
 ### Sessions
 
+Models: `model: "video_only"` (default, video frames + subtitles) or `model: "multimodal"` (unified video + image).
+
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/v2/live-stream/sessions` | Yes | Create session (starts in `WAITING` state) |
-| GET | `/api/v2/live-stream/sessions` | Yes | List sessions |
-| GET | `/api/v2/live-stream/sessions/{session_id}` | Yes | Get session details + WHIP/WHEP URLs |
-| POST | `/api/v2/live-stream/sessions/{session_id}/stop` | Yes | Stop active session |
-| POST | `/api/v2/live-stream/sessions/{session_id}/resume` | Yes | Resume paused/stopped session |
-| DELETE | `/api/v2/live-stream/sessions/{session_id}` | Yes | Delete session permanently |
-| POST | `/api/v2/live-stream/sessions/{session_id}/add-questions` | Yes | Add/update live analysis questions |
-| GET | `/api/v2/live-stream/sessions/{session_id}/indexing-jobs` | Yes | Get current indexing status |
-| GET | `/api/v2/live-stream/sessions/{session_id}/worker-status` | Yes | Poll embedding worker readiness |
-| GET | `/api/v2/live-stream/sessions/{session_id}/mediamtx-status` | Yes | Poll MediaMTX readiness |
+| POST | `/api/v2/live-stream/sessions` | Yes | Create session (starts in `waiting` state); use stream endpoints to create session + start stream in one call |
+| GET | `/api/v2/live-stream/sessions` | Yes | List sessions; optional `?collection_id=` filter |
+| GET | `/api/v2/live-stream/sessions/{session_id}` | Yes | Full session details: status, WHIP/WHEP URLs, plate ID, last 50 segments |
+| POST | `/api/v2/live-stream/sessions/{session_id}/stop` | Yes | Stop active session; collection and plate are preserved |
+| POST | `/api/v2/live-stream/sessions/{session_id}/resume` | Yes | Resume `paused`/`stopped`/`waiting` session; generates fresh MediaMTX path |
+| DELETE | `/api/v2/live-stream/sessions/{session_id}` | Yes | Permanently delete session (irreversible; collection not deleted) |
+| POST | `/api/v2/live-stream/sessions/{session_id}/add-questions` | Yes | Add live analysis questions; `backfill: true` retroactively processes past segments |
+| GET | `/api/v2/live-stream/sessions/{session_id}/indexing-jobs` | Yes | Indexing status: segment count, last job ID, periodic schedule |
+| GET | `/api/v2/live-stream/sessions/{session_id}/worker-status` | Yes | Qwen GPU worker readiness; poll every 10s; `estimated_wait` ~3–5 min cold start |
+| GET | `/api/v2/live-stream/sessions/{session_id}/mediamtx-status` | Yes | **Primary readiness endpoint** — `all_ready: true` when both workers up and URLs active |
 
 ### Protocol-Specific Streams
 
+All endpoints accept: `collection_name` or `collection_id`, `name`, `user_query`, `model`, `periodic_indexing`, `source_url`, `max_fps` (1–60, default 30), `session_id`, `cookies` (YouTube only).
+
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/v2/live-stream/stream` | Yes | Auto-detect protocol and start stream |
-| POST | `/api/v2/live-stream/stream/rtmp` | Yes | RTMP (OBS, encoders) — returns `rtmp_url` for push |
-| POST | `/api/v2/live-stream/stream/rtsp` | Yes | RTSP (IP cameras, NVRs) |
-| POST | `/api/v2/live-stream/stream/srt` | Yes | SRT (low latency, satellite links) |
-| POST | `/api/v2/live-stream/stream/hls` | Yes | HLS / HTTP sources (phones, DroidCam, MJPEG) |
-| POST | `/api/v2/live-stream/stream/webrtc` | Yes | WebRTC (WHIP) via browser |
-| POST | `/api/v2/live-stream/stream/youtube` | Yes | YouTube Live URL |
+| POST | `/api/v2/live-stream/stream` | Yes | Auto-detect protocol from `source_url`; defaults to RTMP push if no URL provided |
+| POST | `/api/v2/live-stream/stream/rtmp` | Yes | RTMP push — OBS, encoders, ffmpeg; returns `publish_url` |
+| POST | `/api/v2/live-stream/stream/rtsp` | Yes | RTSP pull — IP cameras, NVRs; HTTP/MJPEG auto-bridged via ffmpeg |
+| POST | `/api/v2/live-stream/stream/srt` | Yes | SRT pull/push — low-latency or satellite links |
+| POST | `/api/v2/live-stream/stream/hls` | Yes | HLS / HTTP sources — phones (DroidCam), existing HLS streams, MJPEG |
+| POST | `/api/v2/live-stream/stream/webrtc` | Yes | WebRTC WHIP — browser webcam; returns `whip_url` + `whep_url` |
+| POST | `/api/v2/live-stream/stream/youtube` | Yes | YouTube Live/VOD/Shorts — resolved via yt-dlp; `source_url` required |
 
 ### MediaMTX Management
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v2/live-stream/mediamtx/health` | No | Check MediaMTX sidecar reachability |
-| GET | `/api/v2/live-stream/mediamtx/config` | Yes | Get MediaMTX endpoint configuration |
-| GET | `/api/v2/live-stream/mediamtx/streams` | Yes | List active streams with session mappings |
-| GET | `/api/v2/live-stream/mediamtx/streams/{path}` | Yes | Get status of a specific stream path |
-| GET | `/api/v2/live-stream/mediamtx/connections/{protocol}` | Yes | List active connections for a protocol |
-| GET | `/api/v2/live-stream/mediamtx/connections/summary` | Yes | Aggregated connection counts |
+| GET | `/api/v2/live-stream/mediamtx/health` | No | Liveness check — HTTP 503 if unreachable |
+| GET | `/api/v2/live-stream/mediamtx/config` | Yes | Active MediaMTX endpoint URLs (API, RTMP, RTSP, SRT, WebRTC, HLS ports) |
+| GET | `/api/v2/live-stream/mediamtx/streams` | Yes | All active paths with mapped session IDs |
+| GET | `/api/v2/live-stream/mediamtx/streams/{path}` | Yes | Status of a specific path (e.g. `live/sess_abc123`) |
+| GET | `/api/v2/live-stream/mediamtx/connections/{protocol}` | Yes | Active connections for `rtsp`/`rtmp`/`srt`/`hls`/`webrtc` |
+| GET | `/api/v2/live-stream/mediamtx/connections/summary` | Yes | Per-protocol connection counts + total |
 
 ### WebRTC Signaling Proxy
 
-> Auth via `?token=YOUR_API_KEY` query parameter (browser limitation).
+> Auth via `?token=YOUR_API_KEY` query parameter — browsers cannot set custom headers during WebRTC signaling. The `whip_url` / `whep_url` returned by session endpoints already include the token.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST, OPTIONS | `/api/v2/live-stream/sessions/{session_id}/whip` | Token | WHIP publish SDP offer/answer |
-| PATCH, DELETE, OPTIONS | `/api/v2/live-stream/sessions/{session_id}/whip/{resource_id}` | Token | WHIP ICE trickle / teardown |
-| POST, OPTIONS | `/api/v2/live-stream/sessions/{session_id}/whep` | Token | WHEP playback SDP offer/answer |
-| PATCH, DELETE, OPTIONS | `/api/v2/live-stream/sessions/{session_id}/whep/{resource_id}` | Token | WHEP ICE trickle / teardown |
+| POST, OPTIONS | `/api/v2/live-stream/sessions/{session_id}/whip` | Token | WHIP: send SDP offer, receive answer + Location header |
+| PATCH, DELETE, OPTIONS | `/api/v2/live-stream/sessions/{session_id}/whip/{resource_id}` | Token | WHIP: trickle ICE candidates / teardown publish |
+| POST, OPTIONS | `/api/v2/live-stream/sessions/{session_id}/whep` | Token | WHEP: send SDP offer, receive answer + Location header |
+| PATCH, DELETE, OPTIONS | `/api/v2/live-stream/sessions/{session_id}/whep/{resource_id}` | Token | WHEP: trickle ICE candidates / teardown viewer |
 
 ### Internal Webhooks
 
-> These are called by internal infrastructure, not external clients.
+> Called by internal infrastructure only — do not invoke from external clients.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/v2/live-stream/internal/live-plate-updated` | Internal | Embedding worker notifies new extracted_info |
-| POST | `/api/v2/live-stream/internal/segment-recorded` | Internal | Segment uploaded to S3 by MediaMTX |
-| POST | `/api/v2/live-stream/internal/stream-ready` | Internal | Publisher connected |
-| POST | `/api/v2/live-stream/internal/stream-not-ready` | Internal | Publisher disconnected |
+| POST | `/api/v2/live-stream/internal/stream-ready` | Internal | MediaMTX `runOnReady` — session → `streaming` |
+| POST | `/api/v2/live-stream/internal/stream-not-ready` | Internal | MediaMTX `runOnNotReady` — session → `paused` |
+| POST | `/api/v2/live-stream/internal/segment-recorded` | Internal | 16s segment uploaded to S3 — download, index, queue KE |
+| POST | `/api/v2/live-stream/internal/live-plate-updated` | Internal | Qwen worker wrote new KE answers to Live Data Plate |
 
 ---
 

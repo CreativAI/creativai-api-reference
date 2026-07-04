@@ -8,10 +8,10 @@ Choose the model when creating the collection. **This cannot be changed later.**
 
 | Model | `model` param | Vector dimensions | Accepts |
 |---|---|---|---|
-| InternVideo2 (default) | `"default"` | 512 (vision) + 1024 (subtitles) | Video only |
+| Video-Only (default) | `"video_only"` | 512 (vision) + 1024 (subtitles) | Video |
 | Multimodal | `"multimodal"` | 4096 (unified multimodal) | Video, images |
 
-Use `"multimodal"` when you need to index images or want image-based search.
+Use `"multimodal"` when you need to index images alongside video or want image-based semantic search.
 
 ---
 
@@ -24,7 +24,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/collections" \
   -d '{
     "collection_name": "security-footage-q1",
     "description": "Q1 2026 lobby and entrance cameras",
-    "model": "default"
+    "model": "video_only"
   }'
 ```
 
@@ -36,7 +36,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/collections" \
   -d '{
     "collection_name": "security-footage-q1",
     "description": "Q1 2026 lobby cameras",
-    "model": "default",
+    "model": "video_only",
     "organization_id": "org_abc123",
     "project_name": "Campus Security"
   }'
@@ -50,7 +50,7 @@ Response:
     "collection_id": "col_xxxxxxxxxxx",
     "collection_name": "security-footage-q1",
     "description": "Q1 2026 lobby and entrance cameras",
-    "model": "internvideo2",
+    "model": "video_only",
     "status": "active",
     "created_at": "2026-05-25T10:00:00Z"
   }
@@ -343,7 +343,7 @@ Each collection is bound to one embedding model at creation time and cannot be c
 
 | Model | Value | Supports |
 |-------|-------|----------|
-| InternVideo2 | `"default"` | Video only |
+| InternVideo2 | `"video_only"` | Video only |
 | Multimodal | `"multimodal"` | Video, images |
 
 ---
@@ -359,7 +359,7 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/collections" \
   -d '{
     "collection_name": "my-video-library",
     "description": "Marketing footage Q1 2026",
-    "model": "default"
+    "model": "video_only"
   }'
 ```
 
@@ -457,7 +457,7 @@ headers = {"X-API-Key": KEY}
 # Create
 resp = requests.post(f"{BASE}/api/v2/collections",
     headers=headers,
-    json={"collection_name": "my-library", "model": "default"})
+    json={"collection_name": "my-library", "model": "video_only"})
 resp.raise_for_status()
 collection_id = resp.json()["data"]["collection_id"]
 

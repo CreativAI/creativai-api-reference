@@ -81,10 +81,10 @@ class CreativAIClient:
         self,
         name: str,
         description: str = "",
-        model: str = "default",
+        model: str = "video_only",
     ) -> dict:
         """
-        model: "default" (InternVideo2) | "qwen" (Qwen3-VL, multimodal)
+        model: "video_only" (Video-Only) | "multimodal" (Multimodal, video + images)
         """
         return self._data(self._post("collections", {
             "collection_name": name,

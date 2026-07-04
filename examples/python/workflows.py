@@ -37,7 +37,7 @@ def workflow_index_and_search(video_files: list[Path], query: str):
     col = client.create_collection(
         name="Demo Collection",
         description="Uploaded via Python workflow",
-        model="default",  # InternVideo2 (video only)
+        model="video_only",  # video_only (default, video only)
     )
     collection_id = col["collection_id"]
     print(f"Created collection: {collection_id}")
