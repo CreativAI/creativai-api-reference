@@ -30,92 +30,14 @@ export CREATIVAI_API_KEY="<YOUR_API_KEY>"
 
 ### 4. Verify the Key
 
-The web app uses `POST /api/v2/api-keys` (Firebase Bearer token) to get or create your API key:
+Validate your API key by calling `GET /api/v2/users/get_users_info`:
 
 ```bash
-# Get existing key
-curl "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
-
-# Create key if missing (idempotent)
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
-```
-
-**Response:**
-```json
-{ "api_key": "sk_live_xxx" }
-```
-
-To validate an existing API key using the key itself:
-
-```bash
-curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
+curl "$CREATIVAI_BASE_URL/api/v2/users/get_users_info" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
 ```
 
-**Request:** `GET /api/v2/users/api-key-check` (authenticated — send your API key)
-
-**Response (valid key):**
-```json
-{
-  "success": true,
-  "data": { "valid": true },
-  "error": null
-}
-```
-
-**Response (invalid key):**
-```json
-{
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Invalid or missing API key",
-    "details": {},
-    "timestamp": "2026-05-26T10:00:00Z"
-  }
-}
-```
-
----
-
-## Manage API Keys
-
-### Get Existing Key (Web App / Firebase Clients)
-
-`/api/v2/api-keys` endpoints are intended for authenticated web app clients and require a Firebase ID token in `Authorization: Bearer <token>`.
-
-```bash
-curl "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
-```
-
-**Response:**
-```json
-{ "api_key": "sk_live_xxx" }
-```
-
-If no key exists yet:
-
-```json
-{ "api_key": null }
-```
-
-### Create Key If Missing (Web App / Firebase Clients)
-
-```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
-```
-
-**Response:**
-```json
-{ "api_key": "sk_live_xxx" }
-```
-
-This call is idempotent: if a key already exists, the existing key is returned.
+A successful response confirms the key is valid and returns your account info. An `UNAUTHORIZED` error means the key is invalid or missing.
 
 ---
 

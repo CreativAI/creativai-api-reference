@@ -49,23 +49,6 @@ Your API key is **automatically provisioned** when you sign up — there is noth
 
 > **Key format:** Keys begin with `sk_live_`. Never commit them to source control.
 
-### Programmatic API Key Endpoints
-
-```bash
-# Programmatic key retrieval/creation uses Firebase ID token auth,
-# not X-API-Key. This is intended for authenticated web app clients.
-export CREATIVAI_BASE_URL="https://creativai-apis.com"
-export FIREBASE_ID_TOKEN="<FIREBASE_ID_TOKEN>"
-
-# Get existing API key (or null)
-curl "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
-
-# Create key if missing (returns existing key if already created)
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
-```
-
 ---
 
 ## Quick Start
@@ -77,12 +60,7 @@ export CREATIVAI_API_KEY="<YOUR_API_KEY>"
 # Health check (no auth required)
 curl "$CREATIVAI_BASE_URL/health"
 
-# Verify your key is active
-curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
-  -H "X-API-Key: $CREATIVAI_API_KEY"
-# → {"success": true, "data": {"valid": true}}
-
-# Check your credit balance before starting
+# Verify your key is active and check your account info
 curl "$CREATIVAI_BASE_URL/api/v2/users/get_users_info" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
 # → {"data": {"credits_remaining": 5000, "uploaded_hours": 0, ...}}

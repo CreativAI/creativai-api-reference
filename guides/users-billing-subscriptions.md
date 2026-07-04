@@ -68,18 +68,6 @@ curl "$CREATIVAI_BASE_URL/api/v2/users/me/uploaded-hours" \
 }
 ```
 
-### Verify API Key
-
-```bash
-curl "$CREATIVAI_BASE_URL/api/v2/users/api-key-check" \
-  -H "X-API-Key: $CREATIVAI_API_KEY"
-```
-
-**Response:**
-```json
-{ "success": true, "data": { "valid": true }, "error": null }
-```
-
 ### Claim Welcome Credits
 
 One-time bonus credits for new accounts.
@@ -128,33 +116,6 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/users/credits/validate-indexing" \
   "error": null
 }
 ```
-
----
-
-## API Keys
-
-API keys authenticate all API requests. See [authentication.md](authentication.md) for the full dashboard flow.
-
-`/api/v2/api-keys` endpoints are for dashboard clients and require a Firebase ID token:
-
-```bash
-curl "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
-```
-
-**Response:**
-```json
-{ "api_key": "sk_live_xxx" }
-```
-
-Create if missing:
-
-```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/api-keys" \
-  -H "Authorization: Bearer $FIREBASE_ID_TOKEN"
-```
-
-This call returns the existing key if one already exists.
 
 ---
 

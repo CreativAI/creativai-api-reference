@@ -10,26 +10,23 @@ KEY="${CREATIVAI_API_KEY:?Set CREATIVAI_API_KEY}"
 json_field() { python3 -c "import sys,json; print(json.load(sys.stdin)['data']['$1'])"; }
 
 echo "=== 1. Verify authentication ==="
-curl -sf "$BASE/api/v2/users/api-key-check" -H "X-API-Key: $KEY" | python3 -m json.tool
-
-echo "=== 2. Get user info ==="
 curl -sf "$BASE/api/v2/users/get_users_info" -H "X-API-Key: $KEY" | python3 -m json.tool
 
 # ─── Organizations & Projects ─────────────────────────────────────────────────
-echo "=== 3. Create organization ==="
+echo "=== 2. Create organization ==="
 ORG=$(curl -sf -X POST "$BASE/api/v2/organizations" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d '{"organization_name": "Demo Corp"}')
 echo "$ORG" | python3 -m json.tool
 ORG_ID=$(echo "$ORG" | json_field organization_id)
 
-echo "=== 4. Create project ==="
+echo "=== 3. Create project ==="
 curl -sf -X POST "$BASE/api/v2/organizations/$ORG_ID/projects" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d '{"project_name": "Security Analysis"}' | python3 -m json.tool
 
 # ─── Collections ─────────────────────────────────────────────────────────────
-echo "=== 5. Create collection (InternVideo2 — video only) ==="
+echo "=== 4. Create collection (InternVideo2 — video only) ==="
 COL=$(curl -sf -X POST "$BASE/api/v2/collections" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d "{
@@ -41,7 +38,7 @@ echo "$COL" | python3 -m json.tool
 COL_ID=$(echo "$COL" | json_field collection_id)
 echo "Collection ID: $COL_ID"
 
-echo "=== 6. Create collection (Qwen3-VL — multimodal) ==="
+echo "=== 5. Create collection (Qwen3-VL — multimodal) ==="
 MULTIMODAL_COL=$(curl -sf -X POST "$BASE/api/v2/collections" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d "{
@@ -52,20 +49,20 @@ MULTIMODAL_COL=$(curl -sf -X POST "$BASE/api/v2/collections" \
 echo "$MULTIMODAL_COL" | python3 -m json.tool
 MULTIMODAL_COL_ID=$(echo "$MULTIMODAL_COL" | json_field collection_id)
 
-echo "=== 7. List all collections ==="
+echo "=== 6. List all collections ==="
 curl -sf "$BASE/api/v2/collections" -H "X-API-Key: $KEY" | python3 -m json.tool
 
-echo "=== 8. Get collection details ==="
+echo "=== 7. Get collection details ==="
 curl -sf "$BASE/api/v2/collections/$COL_ID" -H "X-API-Key: $KEY" | python3 -m json.tool
 
-echo "=== 9. Update collection ==="
+echo "=== 8. Update collection ==="
 curl -sf -X PATCH "$BASE/api/v2/collections/$COL_ID" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d '{"collection_name": "demo-updated", "description": "Updated description"}' \
   | python3 -m json.tool
 
 # ─── File Upload (presigned URL) ──────────────────────────────────────────────
-echo "=== 10. Get single upload URL ==="
+echo "=== 9. Get single upload URL ==="
 UPLOAD=$(curl -sf -X POST "$BASE/api/v2/collections/$COL_ID/upload-url" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d '{"filename": "sample.mp4", "content_type": "video/mp4"}')
@@ -74,7 +71,7 @@ UPLOAD_URL=$(echo "$UPLOAD" | python3 -c "import sys,json; print(json.load(sys.s
 echo "Upload URL (PUT directly to S3):"
 echo "  curl -X PUT '$UPLOAD_URL' -H 'Content-Type: video/mp4' --data-binary @sample.mp4"
 
-echo "=== 11. Get batch upload URLs ==="
+echo "=== 10. Get batch upload URLs ==="
 curl -sf -X POST "$BASE/api/v2/collections/$COL_ID/upload-urls" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d '{
@@ -85,7 +82,7 @@ curl -sf -X POST "$BASE/api/v2/collections/$COL_ID/upload-urls" \
   }' | python3 -m json.tool
 
 # ─── Multipart Upload (large files) ──────────────────────────────────────────
-echo "=== 12. Initiate multipart upload ==="
+echo "=== 11. Initiate multipart upload ==="
 MP_INIT=$(curl -sf -X POST "$BASE/api/v2/collections/uploads/initiate" \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
   -d "{
@@ -99,13 +96,13 @@ echo "  Upload each part with: curl -X PUT <part_url> --data-binary @<chunk>"
 echo "  Then complete with /collections/uploads/$MP_UPLOAD_ID/complete"
 
 # ─── S3 Transfer ──────────────────────────────────────────────────────────────
-echo "=== 13. Start S3 transfer ==="
+echo "=== 12. Start S3 transfer ==="
 # (Replace with actual S3 source)
 echo "  POST $BASE/api/v2/transfers"
 echo "  Body: {\"collection_id\": \"$COL_ID\", \"source_url\": \"s3://your-bucket/videos/\"}"
 
 # ─── Cleanup ─────────────────────────────────────────────────────────────────
-echo "=== 14. List media in collection ==="
+echo "=== 13. List media in collection ==="
 curl -sf "$BASE/api/v2/collections/$COL_ID/media" -H "X-API-Key: $KEY" | python3 -m json.tool
 
 echo ""

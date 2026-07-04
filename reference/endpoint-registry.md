@@ -480,22 +480,11 @@ Prefix: `/api/v2/users`
 | GET | `/api/v2/users/me/uploaded-hours` | Yes | Total uploaded hours + storage |
 | GET | `/api/v2/users/me/info` | Yes | Credits, hours, search requests |
 | GET | `/api/v2/users/get_users_info` | Yes | Get account info (active alias used by the web app) |
-| GET | `/api/v2/users/api-key-check` | Yes | Validate API key for authenticated caller |
-| GET | `/api/v2/users/api-key-check/{user_id_param}` | Yes | Validate API key for explicit user ID (admin/internal use) |
 | POST | `/api/v2/users/credits/claim-welcome` | Yes | Claim one-time welcome credits |
 | POST | `/api/v2/users/credits/validate-indexing` | Yes | Check credit sufficiency for indexing |
 | POST | `/api/v2/users/credits/validate-video-qa` | Yes | Check credit sufficiency for video QA |
 | POST | `/api/v2/users/credits/consume-video-qa` | Yes | Consume credits for video QA |
 | POST | `/api/v2/users/credits/consume-indexing` | Yes | Consume credits for indexing |
-
-### API Keys
-
-Prefix: `/api/v2/api-keys`
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/v2/api-keys` | Firebase Bearer token | Get caller API key (or null if none exists) |
-| POST | `/api/v2/api-keys` | Firebase Bearer token | Create key if missing (returns existing if already created) |
 
 ---
 

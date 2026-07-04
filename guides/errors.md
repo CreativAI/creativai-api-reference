@@ -109,7 +109,7 @@ When `success` is `true`, `error` is `null`. When `success` is `false`, `data` i
 }
 ```
 
-**Fix:** Ensure you're sending `X-API-Key: sk_live_...` in the request header. Verify the key at `GET /api/v2/users/api-key-check` using the same header.
+**Fix:** Ensure you're sending `X-API-Key: sk_live_...` in the request header. Verify the key at `GET /api/v2/users/get_users_info` using the same header.
 
 ### `BAD_REQUEST` — preprocessing not complete
 
