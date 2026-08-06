@@ -104,6 +104,8 @@ class CreativAIClient:
 
     # ─── Media Upload ─────────────────────────────────────────────────────────
 
+    _PART_SIZE = 25 * 1024 * 1024  # 25 MB per multipart part
+
     def get_upload_url(self, collection_id: str, filename: str, content_type: str = "video/mp4") -> dict:
         return self._data(self._post(f"collections/{collection_id}/upload-url", {
             "filename": filename,
@@ -114,16 +116,82 @@ class CreativAIClient:
         """files: [{"filename": "...", "content_type": "..."}]"""
         return self._data(self._post(f"collections/{collection_id}/upload-urls", {"files": files}))
 
+    def initiate_multipart_upload(
+        self,
+        collection_id: str,
+        filename: str,
+        file_size: int,
+        content_type: str = "video/mp4",
+    ) -> dict:
+        """
+        Initiate a multipart upload.
+        Returns the first item of uploads[] — contains upload_id, presigned_urls, part_size, s3_key.
+        """
+        resp = self._data(self._post("collections/uploads/initiate", {
+            "collection_id": collection_id,
+            "files": [{"filename": filename, "file_size": file_size, "content_type": content_type}],
+        }))
+        uploads = resp.get("uploads", [])
+        return uploads[0] if uploads else resp
+
+    def complete_multipart_upload(self, upload_id: str, parts: list[dict]) -> dict:
+        """
+        Complete a multipart upload after all parts have been PUT.
+        parts: [{"part_number": int, "etag": str}]
+        Triggers preprocessing automatically.
+        """
+        return self._data(self._post(f"collections/uploads/{upload_id}/complete", {
+            "parts": parts,
+        }))
+
     def upload_file(self, collection_id: str, file_path: str | Path) -> str:
-        """Upload a local file using a presigned URL. Returns the S3 URI."""
+        """
+        Upload a local file via the multipart upload API.
+        Flow: initiate → PUT each part → complete (triggers preprocessing).
+        Returns the S3 URI of the uploaded file.
+        """
         file_path = Path(file_path)
-        content_type = "video/mp4" if file_path.suffix in (".mp4", ".mov", ".avi") else "image/jpeg"
-        resp = self.get_upload_url(collection_id, file_path.name, content_type)
-        upload_url = resp["upload_url"]
+        ext = file_path.suffix.lower()
+        content_type = "video/mp4" if ext in (".mp4", ".mov", ".avi", ".mkv", ".webm") else "image/jpeg"
+        file_size = file_path.stat().st_size
+
+        # Step 1 — Initiate: get upload_id + presigned part URLs
+        upload_info = self.initiate_multipart_upload(
+            collection_id, file_path.name, file_size, content_type
+        )
+        upload_id     = upload_info["upload_id"]
+        presigned_urls = upload_info["presigned_urls"]
+        part_size      = upload_info.get("part_size", self._PART_SIZE)
+        s3_key         = upload_info.get("s3_key", "")
+
+        # Step 2 — PUT each chunk to its presigned S3 URL
+        parts: list[dict] = []
         with open(file_path, "rb") as f:
-            put_resp = requests.put(upload_url, data=f, headers={"Content-Type": content_type})
-            put_resp.raise_for_status()
-        return resp.get("s3_uri", resp.get("media_uri", ""))
+            for i, url_entry in enumerate(presigned_urls, 1):
+                # presigned_urls may be plain strings or {"url": ..., "part_number": ...} dicts
+                url = url_entry.get("url") if isinstance(url_entry, dict) else url_entry
+                chunk = f.read(part_size)
+                if not chunk:
+                    break
+                put_resp = requests.put(url, data=chunk)
+                put_resp.raise_for_status()
+                etag = put_resp.headers.get("ETag", "").strip('"')
+                parts.append({"part_number": i, "etag": etag})
+
+        # Step 3 — Complete: finalize on S3, triggers Lambda preprocessing
+        self.complete_multipart_upload(upload_id, parts)
+
+        # Derive the S3 URI from the upload info
+        if s3_key:
+            # Extract bucket from first presigned URL (https://<bucket>.s3.amazonaws.com/...)
+            first_url = (
+                presigned_urls[0].get("url")
+                if isinstance(presigned_urls[0], dict)
+                else presigned_urls[0]
+            )
+            bucket = first_url.split("/")[2].split(".s3.")[0]
+            return f"s3://{bucket}/{s3_key}"
+        return upload_info.get("s3_uri", file_path.name)
 
     def list_media(self, collection_id: str) -> list[dict]:
         return self._data(self._get(f"collections/{collection_id}/media"))
@@ -138,7 +206,8 @@ class CreativAIClient:
         start = time.time()
         while True:
             status = self.get_preprocessing_status(collection_id)
-            print(f"Preprocessing: {status.get('status')} | can_start_indexing={status.get('can_start_indexing')}")
+            pre_st = status.get('preprocessing_status', status.get('status', 'unknown'))
+            print(f"Preprocessing: {pre_st} | can_start_indexing={status.get('can_start_indexing')}")
             if status.get("can_start_indexing"):
                 return status
             if time.time() - start > max_wait:
@@ -190,33 +259,32 @@ class CreativAIClient:
         query: str | None = None,
         image_base64: str | None = None,
         image_key: str | None = None,
-        top_k: int = 10,
+        top_k: int = 50,
         search_type: str = "hybrid",
         filters: dict | None = None,
         search_id: str | None = None,
         page_number: int | None = None,
+        page_size: int | None = None,
     ) -> dict:
         """
         search_type: "hybrid" | "vision" | "audio"
-        For image-based search (Qwen only): provide image_base64 or image_key instead of query.
+        Response contains "search_id" plus "high", "medium", "low" segment arrays.
+        For image-based search (multimodal collections only): provide image_base64 or image_key.
         """
         body: dict = {
             "collection_id": collection_id,
-            "top_k": top_k,
+            "page_size": page_size if page_size is not None else top_k,
             "search_type": search_type,
+            "page_number": page_number or 1,
         }
         if query:
-            body["query"] = query
+            body["text_query"] = query
         if image_base64:
             body["image_base64"] = image_base64
         if image_key:
             body["image_key"] = image_key
-        if filters:
-            body["filters"] = filters
         if search_id:
             body["search_id"] = search_id
-        if page_number:
-            body["page_number"] = page_number
         return self._data(self._post("search", body))
 
     def search_with_image_file(self, collection_id: str, image_path: str | Path, **kwargs) -> dict:
@@ -227,11 +295,11 @@ class CreativAIClient:
 
     # ─── Data Plates ─────────────────────────────────────────────────────────
 
-    def create_plate(self, collection_id: str, name: str, search_query: str, top_k: int = 50) -> dict:
+    def create_plate(self, collection_id: str, name: str, search_id: str, top_k: int = 50) -> dict:
         return self._data(self._post("data-plates/create", {
             "collection_id": collection_id,
-            "plate_name": name,
-            "search_query": search_query,
+            "name": name,
+            "search_id": search_id,
             "top_k": top_k,
         }))
 

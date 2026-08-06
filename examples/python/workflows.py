@@ -178,8 +178,7 @@ def workflow_data_plates_ke(collection_id: str):
     chat = client.ke_chat_query(
         collection_id=collection_id,
         plate_id=plate_id,
-        query="Which camera location has the most PPE violations?",
-        model_version="base",
+        message="Which camera location has the most PPE violations?",
         aggregate_segments=True,
     )
     print(f"  Answer: {chat.get('message', chat)[:300]}")
@@ -207,7 +206,7 @@ def workflow_agentic_chat(collection_id: str, questions: list[str]):
         full_response = ""
         interrupt_type = None
 
-        for event in client.agentic_chat_stream(session_id, collection_id, message=question):
+        for event in client.chat_stream(session_id, collection_id, message=question):
             et = event.get("event")
             data = event.get("data", {})
 
