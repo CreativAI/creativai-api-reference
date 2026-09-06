@@ -1,6 +1,6 @@
 # CreativAI API — Complete Endpoint Registry
 
-> Last updated: 2026-07-04  
+> Last updated: 2026-09-06  
 > This document is published as integration reference and intentionally excludes backend implementation details.  
 > **Version policy:** Use `/api/v2/` for all client integrations. Some deployments still expose `/api/v3/` aliases for backward compatibility.  
 > **Base URL:** `https://creativai-apis.com`  
@@ -17,18 +17,19 @@
 | Organizations | 4 | |
 | Projects | 4 | |
 | Collections | 8 | |
-| Media / Videos | 4 | |
+| Media / Videos | 6 | Adds `confirm-upload` (async, tags + metadata) |
 | Multipart Uploads | 4 | |
 | S3 Transfers | 3 | |
 | Indexing | 6 | Async (202) |
-| Search | 1 | |
-| Data Plates | 16 | v2 routes |
+| Tags & Metadata | 7 | Vocabulary + async update jobs |
+| Search | 5 | POST /search is now async (202); GET /search/jobs/{id} to poll; video-query aliases |
+| Data Plates | 17 | Adds `verify` |
 | Sub-Plates | 9 | v2 |
-| Knowledge Extraction | 8 | v2 |
+| Knowledge Extraction | 9 | Adds `columns/estimate-cost` |
 | Chat (Plate Sessions) | 5 | |
-| Agentic Chat | 12 | SSE streaming |
+| Agentic Chat | 12 | SSE streaming + one-shot structured-query |
 | Jobs | 1 | Unified job cancellation |
-| Collection Sharing & RBAC | 25 | |
+| Collection Sharing & RBAC | 24 | |
 | Collection Tasks | 12 | |
 | Live Stream — Sessions | 10 | `video_only` / `multimodal` models |
 | Live Stream — Protocol Streams | 7 | |
@@ -38,12 +39,16 @@
 | Online Search | 6 | Async |
 | YouTube Search | 9 | **v2** (latest) |
 | Transactions | 9 | |
-| Users | 11 | |
-| Payments | 3 | |
-| Subscriptions | 14 | |
+| Users | 11 | Adds `api-key-check` |
+| Payments | 4 | Adds `checkout` |
+| Subscriptions | 15 | Adds admin-only surface |
 | Invoices | 3 | |
-| Admin Dashboard | 12 | Admin only |
-| **Total** | **~236** | |
+| Admin Dashboard | 29 | Adds overview, revenue, credits, cloud-costs, user-activity, credit-override |
+| Authentication & API Keys | 6 | Firebase-bearer, dashboard-only |
+| License | 2 | Deployment entitlements |
+| Files | 1 | Presigned GET redirect |
+| Upload Integrations | 5 | Google Drive, Dropbox, Hugging Face |
+| **Total** | **~271** | |
 
 ---
 
@@ -107,10 +112,12 @@ Prefix: `/api/v2/collections/{collection_id}`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v2/collections/{collection_id}/media` | Yes | List all media with preprocessing status |
+| GET | `/api/v2/collections/{collection_id}/media` | Yes | List all media with preprocessing status; each item includes `tags: [str]` and `metadata: {key: value}` (bare, no `{datatype, value}` envelope) |
 | DELETE | `/api/v2/collections/{collection_id}/media` | Yes | Remove specific media files |
 | POST | `/api/v2/collections/{collection_id}/upload-url` | Yes | Get presigned S3 URL (single file) |
 | POST | `/api/v2/collections/{collection_id}/upload-urls` | Yes | Get presigned URLs (batch) |
+| POST | `/api/v2/collections/{collection_id}/confirm-upload` | Yes | Confirm presigned uploads and start preprocessing (async, 202). Accepts optional `tags` and `metadata` maps keyed by media handle, with `"*"` wildcard applying to every handle. `metadata_schema` may declare enums inline. Idempotency-Key header supported. |
+| GET | `/api/v2/collections/{collection_id}/confirm-upload/jobs/{job_id}` | Yes | Poll a confirm-upload job — `triggered`, `files`, `errors` |
 
 ---
 
@@ -152,17 +159,48 @@ Prefix: `/api/v2/indexing`
 | GET | `/api/v2/indexing/preprocessed-videos/{collection_id}` | Yes | List media ready for indexing |
 | GET | `/api/v2/indexing/video-status` | Yes | Preprocessing status for a specific video |
 
-**Key indexing body params:** `collection_id` (required), `media_s3_uris` (optional list), `tags` (optional map of S3 URI → string list, `"*"` for all)
+**Key indexing body params:** `collection_id` (required), `media_ids` (optional list of media handles). Sending `tags` here is now rejected with `400` — tags are declared at upload time on `POST /api/v2/collections/{collection_id}/confirm-upload`, because they are written onto the chunk rows the moment preprocessing creates them.
 
 ---
 
-## 9. Search
+## 9. Tags & Metadata
+
+Per-media labels (`tags`) and typed key/value properties (`metadata`) are declared at upload time on `POST /api/v2/collections/{collection_id}/confirm-upload` and used as filters on `POST /api/v2/search`. Changing them after upload rewrites every chunk row of the affected media, so those endpoints return `202` with a `job_id`.
+
+Prefix: `/api/v2/collections/{collection_id}`
+
+### Tag vocabulary and updates
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v2/collections/{collection_id}/tags` | Yes | Sorted vocabulary of tags in use; response carries `tags: [str]` and `tag_counts: {tag: count}`. Recomputed after every tag update job — a tag that no longer applies to any media disappears from it. |
+| POST | `/api/v2/collections/{collection_id}/tags` | Yes | Add/remove tag deltas across media in the collection (202, background job). Body: `{add?: [str], remove?: [str], media_ids?: [str], all_media?: bool}`. Media that is still preprocessing or currently indexing is **skipped** (not failed) and the job finishes as `partial` — retry once indexing finishes. |
+| GET | `/api/v2/collections/{collection_id}/tags/jobs/{job_id}` | Yes | Poll a tag update job — `submitted` → `in_progress` → `completed` / `partial` / `failed` |
+
+### Metadata schema and updates
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v2/collections/{collection_id}/metadata-schema` | Yes | The collection's learned metadata registry: each key's `type` (`number`, `string`, `bool`, `enum`, `list`), the observed `values` and `value_counts` (nulled once a string key exceeds 50 distinct values), `min`/`max` for numeric keys, and `count`. Feed the chosen keys into `meta_filter` on `POST /search`. |
+| POST | `/api/v2/collections/{collection_id}/metadata-schema/enums` | Yes | Declare enum keys and their legal values, e.g. `{"metadata_schema": {"region": {"type": "enum", "values": ["eu", "us", "apac"]}}}`. Declaration only — records nothing on media. Idempotent; values may only be added, never removed. A key already stored under another datatype cannot be redeclared as an enum (`409`). |
+| POST | `/api/v2/collections/{collection_id}/metadata` | Yes | Set/unset metadata keys on media in this collection (202, background job). Body: `{set?: {key: {datatype, value}}, unset?: [str], metadata_schema?: {...}, media_ids?: [str], all_media?: bool}`. Enum widenings in `metadata_schema` are applied before the delta so a new member can be declared and used in one request. Type conflicts and out-of-set enum values are rejected before the job starts (`400`). |
+| GET | `/api/v2/collections/{collection_id}/metadata/jobs/{job_id}` | Yes | Poll a metadata update job — `submitted` → `in_progress` → `completed` / `partial` / `failed` |
+
+**Metadata envelope on write:** every value carries its type, e.g. `{"duration": {"datatype": "number", "value": 24.5}, "region": {"datatype": "enum", "value": "eu"}, "cameras": {"datatype": "list", "value": ["front", "rear"]}}`. `datatype` is one of `number`, `string`, `bool`, `enum`, `list`. Bare values are rejected with `422`. `GET /media` returns the **read** shape — bare values only, no envelope. Storage ceiling is 65,536 bytes of metadata per media (checked against the merged form after the `"*"` wildcard is applied).
+
+---
+
+## 10. Search
 
 Prefix: `/api/v2/search`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/v2/search` | Yes | Semantic search (hybrid / vision / audio) |
+| POST | `/api/v2/search` | Yes | Submit a semantic search (hybrid / vision / audio / image / video). Returns `202` with a `search_job_id` for new searches; returns `200` with the page when paginating an existing `search_id`. |
+| POST | `/api/v2/search/upload-url` | Yes | Presigned S3 PUT URL for a video-query clip (multimodal collections only). Alias: `/api/v2/search/video/upload-url` |
+| POST | `/api/v2/search/estimate` | Yes | Estimate credit cost of a search. Alias: `/api/v2/search/video/estimate` |
+| GET | `/api/v2/search/jobs/{job_id}` | Yes | Poll any search job (`ssj_...`, `vsj_...`) — returns `submitted` / `in_progress` until the search finishes, then `completed` with the first page and, when metadata was in play, a `metadata_filter` block naming what actually ran |
+| POST | `/api/v2/search/{search_id}/feedback` | Yes | Report result quality on a completed search |
 
 **Request body params:**
 
@@ -173,15 +211,34 @@ Prefix: `/api/v2/search`
 | `search_type` | string | No | `"hybrid"` (default), `"vision"`, `"audio"` |
 | `page_number` | int | No | 1-indexed (default: 1) |
 | `page_size` | int | No | Results per page (default: 100, max ~500) |
-| `search_id` | string | No | Reuse previous search for pagination |
+| `search_id` | string | No | Reuse previous search for pagination (bypasses the async submit path) |
 | `video_urls` | list[string] | No | Restrict to specific S3 URIs |
+| `tags` | list[string] | No | Restrict to media carrying **at least one** of these tags (OR semantics, case-insensitive). Vocabulary from `GET /collections/{id}/tags`. |
+| `meta_filter` | object | No | AST-shaped filter over metadata keys (`{op: and\|or, clauses: [{key, cmp, value}, ...]}`). Comparators depend on the key type — see `guides/indexing-and-search.md`. Referencing a key the collection has never seen is `400`. |
+| `plan_metadata` | bool | No | When `true`, an LLM splits `text_query` into its visual part and its metadata part. Opt-in because it costs one extra LLM call on the request path. Ignored when `meta_filter` is supplied explicitly, no-op on collections with no metadata. |
 | `refine_query` | bool | No | LLM rewrites query for better recall |
-| `image_base64` | string | No | Base64 image for visual query (multi-modal collections) |
+| `min_score` | float | No | Drop hits scoring below this floor (buckets are still returned; scale is model-dependent) |
+| `include_scores` | bool | No | Return `scores` array (raw similarities before bucketing and `min_score`) |
+| `score_bins` | int | No | Return a `score_histogram` with this many equal-width bins to help calibrate `min_score` |
+| `image_base64` | string | No | Base64 image for visual query (multi-modal collections; deprecated in favour of `image_key`) |
 | `image_key` | string | No | S3 key of uploaded image (multi-modal collections, preferred) |
+| `video_key` | string | No | S3 key of an uploaded query clip (from `POST /search/upload-url`) — routes the search through the GPU video-query pipeline |
+| `top_k` | int | No | Max results for a video-query search |
+
+**Job response fields (when completed):**
+
+| Field | Description |
+|-------|-------------|
+| `high` / `medium` / `low` | Bucketed result arrays |
+| `total_items`, `total_pages`, `page_number`, `page_size`, `items_on_page` | Pagination metadata |
+| `level_info` | Per-bucket page ranges |
+| `search_id`, `search_job_id`, `poll_url` | Job identifiers for pagination and re-poll |
+| `metadata_filter` | `{applied, planned, text_query}` — echoes the filter AST that actually ran (planner degrades gracefully; a dropped clause is absent from `applied`, and its wording goes back into `text_query`). `null`/absent when no metadata was in play. |
+| `scores`, `score_histogram` | Only when requested via `include_scores` / `score_bins` |
 
 ---
 
-## 10. Data Plates
+## 11. Data Plates
 
 Prefix: `/api/v2/data-plates`
 
@@ -194,6 +251,7 @@ Prefix: `/api/v2/data-plates`
 | GET | `/api/v2/data-plates/jobs/{job_id}` | Yes | Poll plate creation job |
 | POST | `/api/v2/data-plates/update` | Yes | Update plate name/metadata |
 | POST | `/api/v2/data-plates/delete` | Yes | Delete plate + all extracted data |
+| POST | `/api/v2/data-plates/verify` | Yes | Relevance-verify a plate (async, 202) — trims segments whose similarity to the plate's `user_query` falls below the cutoff; no knowledge columns created. Poll `GET /knowledge-extraction/jobs/{job_id}`. |
 | POST | `/api/v2/data-plates/segments/add` | Yes | Add segments to plate |
 | POST | `/api/v2/data-plates/segments/remove` | Yes | Remove segments from plate |
 | POST | `/api/v2/data-plates/segments/update-extracted-info` | Yes | Update a single extracted info field |
@@ -206,7 +264,7 @@ Prefix: `/api/v2/data-plates`
 
 ---
 
-## 11. Sub-Plates
+## 12. Sub-Plates
 
 Prefix: `/api/v2/data-plates/sub-plates`
 
@@ -224,13 +282,14 @@ Prefix: `/api/v2/data-plates/sub-plates`
 
 ---
 
-## 12. Knowledge Extraction
+## 13. Knowledge Extraction
 
 Prefix: `/api/v2/knowledge-extraction`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/api/v2/knowledge-extraction/columns/add` | Yes | Add extraction columns (questions) to plate (202) |
+| POST | `/api/v2/knowledge-extraction/columns/estimate-cost` | Yes | Estimate credit cost of adding columns before running the job |
 | POST | `/api/v2/knowledge-extraction/columns/list` | Yes | List extracted columns in plate |
 | POST | `/api/v2/knowledge-extraction/columns/remove` | Yes | Remove extraction column from all segments |
 | GET | `/api/v2/knowledge-extraction/jobs/{job_id}` | Yes | Poll extraction job status |
@@ -241,7 +300,7 @@ Prefix: `/api/v2/knowledge-extraction`
 
 ---
 
-## 13. Chat (Data Plate Sessions)
+## 14. Chat (Data Plate Sessions)
 
 Prefix: `/api/v2/chat`
 
@@ -255,7 +314,7 @@ Prefix: `/api/v2/chat`
 
 ---
 
-## 14. Agentic Chat
+## 15. Agentic Chat
 
 Prefix: `/api/v2/agentic-chat`
 
@@ -270,15 +329,15 @@ Prefix: `/api/v2/agentic-chat`
 | POST | `/api/v2/agentic-chat/sessions/{session_id}/search-feedback` | Yes | Respond to `search_feedback_required` interrupt |
 | POST | `/api/v2/agentic-chat/sessions/{session_id}/stop` | Yes | Stop agent at current step |
 | POST | `/api/v2/agentic-chat/sessions/{session_id}/resume` | Yes | Resume agent after interrupt |
-| GET | `/api/v2/agentic-chat/sessions/{session_id}/events` | Yes | Poll new agent events since last call |
 | GET | `/api/v2/agentic-chat/sessions/{session_id}/stream` | Yes | Subscribe to running agent SSE stream (GET) |
-| GET | `/api/v2/agentic-chat/sessions/{session_id}/status` | Yes | Check current agent status |
+| POST | `/api/v2/agentic-chat/structured-query` | Yes | Submit a one-shot structured-output query against a collection (async, 202) — no session, no history; returns a `job_id` |
+| GET | `/api/v2/agentic-chat/structured-query/{job_id}` | Yes | Poll a structured-query job — `submitted` → `in_progress` → `completed` / `failed`, then the parsed JSON result |
 
 **SSE chat headers required:** `Accept: text/event-stream`, `Content-Type: application/json`
 
 ---
 
-## 15. Jobs
+## 16. Jobs
 
 Prefix: `/api/v2/jobs`
 
@@ -310,7 +369,7 @@ A unified endpoint to cancel any running async job by removing its pending messa
 
 ---
 
-## 16. Collection Sharing & RBAC
+## 17. Collection Sharing & RBAC
 
 Prefix: `/api/v2/sharing`
 
@@ -349,6 +408,7 @@ Prefix: `/api/v2/sharing`
 | POST | `/api/v2/sharing/members/bulk-assign-group` | Yes (admin) | Bulk-assign group to multiple members |
 | POST | `/api/v2/sharing/members/remove-groups` | Yes | Remove groups from member |
 | POST | `/api/v2/sharing/members/by-group` | Yes | List members by group |
+| POST | `/api/v2/sharing/groups/members` | Yes | Alias of `members/by-group` — list members in a group |
 
 ### Device Tokens (FCM Push Notifications)
 
@@ -359,7 +419,7 @@ Prefix: `/api/v2/sharing`
 
 ---
 
-## 17. Collection Tasks
+## 18. Collection Tasks
 
 Prefix: `/api/v2/tasks`
 
@@ -380,7 +440,7 @@ Prefix: `/api/v2/tasks`
 
 ---
 
-## 18. Live Stream
+## 19. Live Stream
 
 Prefix: `/api/v2/live-stream`
 
@@ -450,7 +510,7 @@ All endpoints accept: `collection_name` or `collection_id`, `name`, `user_query`
 
 ---
 
-## 19. Online Search
+## 20. Online Search
 
 Prefix: `/api/v2/online-search`
 
@@ -465,7 +525,7 @@ Prefix: `/api/v2/online-search`
 
 ---
 
-## 20. YouTube Search
+## 21. YouTube Search
 
 > **Use `/api/v2/yt-search-v2/`** — this is the latest version. V1 (`/api/v2/yt-search/`) is legacy.
 
@@ -485,7 +545,7 @@ Prefix: `/api/v2/yt-search-v2`
 
 ---
 
-## 21. Transactions
+## 22. Transactions
 
 Prefix: `/api/v2/transactions`
 
@@ -503,7 +563,7 @@ Prefix: `/api/v2/transactions`
 
 ---
 
-## 22. Users
+## 23. Users
 
 Prefix: `/api/v2/users`
 
@@ -513,6 +573,8 @@ Prefix: `/api/v2/users`
 | GET | `/api/v2/users/me/uploaded-hours` | Yes | Total uploaded hours + storage |
 | GET | `/api/v2/users/me/info` | Yes | Credits, hours, search requests |
 | GET | `/api/v2/users/get_users_info` | Yes | Get account info (active alias used by the web app) |
+| GET | `/api/v2/users/api-key-check` | Yes | Confirm the caller's API key is active |
+| GET | `/api/v2/users/api-key-check/{user_id_param}` | Yes | Admin: check whether a given user has an active API key |
 | POST | `/api/v2/users/credits/claim-welcome` | Yes | Claim one-time welcome credits |
 | POST | `/api/v2/users/credits/validate-indexing` | Yes | Check credit sufficiency for indexing |
 | POST | `/api/v2/users/credits/validate-video-qa` | Yes | Check credit sufficiency for video QA |
@@ -521,19 +583,20 @@ Prefix: `/api/v2/users`
 
 ---
 
-## 23. Payments
+## 24. Payments
 
 Prefix: `/api/v2/payments`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| POST | `/api/v2/payments/checkout` | Yes | Create a one-off payment checkout session |
 | POST | `/api/v2/payments/stripe-webhook` | No (Stripe sig) | Stripe event webhook (called by Stripe, not clients) |
 | GET | `/api/v2/payments/status/{payment_id}` | No | Get payment status |
 | GET | `/api/v2/payments/verify/{payment_id}` | Yes | Verify payment + confirm credits added |
 
 ---
 
-## 24. Subscriptions
+## 25. Subscriptions
 
 Prefix: `/api/v2/subscriptions`
 
@@ -550,9 +613,19 @@ Prefix: `/api/v2/subscriptions`
 | POST | `/api/v2/subscriptions/cancel` | Yes | Cancel at end of billing period |
 | GET | `/api/v2/subscriptions/billing/overdue-status` | Yes | Storage overdue status |
 
+### Admin-only
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v2/subscriptions/admin/set-tier` | Admin | Force a user onto a specific tier |
+| POST | `/api/v2/subscriptions/admin/enterprise` | Admin | Provision an enterprise subscription |
+| POST | `/api/v2/subscriptions/admin/reset-free-tier` | Admin | Reset a user back to the free tier |
+| POST | `/api/v2/subscriptions/admin/bill-storage` | Admin | Charge overdue storage fees for a user |
+| POST | `/api/v2/subscriptions/admin/process-storage-overdue` | Admin | Sweep-and-charge job for all overdue-storage accounts |
+
 ---
 
-## 25. Invoices
+## 26. Invoices
 
 Prefix: `/api/v2/invoices`
 
@@ -564,30 +637,74 @@ Prefix: `/api/v2/invoices`
 
 ---
 
-## 26. Admin Dashboard
+## 27. Admin Dashboard
 
 > These endpoints require admin-level access and are not available to regular API keys.
 
-Prefix: `/api/v2/admin/dashboard`
+Prefix: `/api/v2/admin/dashboard` · credit override at `/api/v2/admin/credits`
+
+### Overview & user analytics
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| GET | `/api/v2/admin/dashboard/overview` | Admin | Top-level dashboard cards — users, revenue, credit consumption, alerts |
 | GET | `/api/v2/admin/dashboard/users/count` | Admin | Total user count |
 | GET | `/api/v2/admin/dashboard/users/new` | Admin | New users within date range |
 | GET | `/api/v2/admin/dashboard/users/analytics` | Admin | Paginated user analytics |
+| GET | `/api/v2/admin/dashboard/users/activity/segments` | Admin | Active / dormant / churned user segments |
+| GET | `/api/v2/admin/dashboard/users/activity/recent-signups` | Admin | Latest sign-ups with first-day engagement |
+| GET | `/api/v2/admin/dashboard/users/activity/signup-trend` | Admin | Sign-up trend over time |
+| GET | `/api/v2/admin/dashboard/users/activity/retention` | Admin | Cohort retention matrix |
+
+### Platform usage stats
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
 | GET | `/api/v2/admin/dashboard/stats/plates` | Admin | Data plate count |
 | GET | `/api/v2/admin/dashboard/stats/collections` | Admin | Collection count |
 | GET | `/api/v2/admin/dashboard/stats/credits-used` | Admin | Total credits used |
 | GET | `/api/v2/admin/dashboard/stats/recent-plates` | Admin | Recently created plates |
 | GET | `/api/v2/admin/dashboard/stats/recent-collections` | Admin | Recently created collections |
+
+### Revenue
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v2/admin/dashboard/revenue/summary` | Admin | Aggregate revenue summary |
+| GET | `/api/v2/admin/dashboard/revenue/trend` | Admin | Revenue trend over time |
+| GET | `/api/v2/admin/dashboard/revenue/monthly` | Admin | Monthly revenue breakdown |
+| GET | `/api/v2/admin/dashboard/revenue/top-customers` | Admin | Highest-revenue customers |
+| GET | `/api/v2/admin/dashboard/revenue/subscriptions` | Admin | Revenue by subscription tier |
+
+### Credit consumption
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v2/admin/dashboard/credits/top-consumers` | Admin | Users consuming the most credits |
+| GET | `/api/v2/admin/dashboard/credits/fast-burn` | Admin | Users burning credits abnormally fast |
+| GET | `/api/v2/admin/dashboard/credits/trend` | Admin | Credit consumption trend over time |
+| GET | `/api/v2/admin/dashboard/credits/by-operation` | Admin | Credits consumed grouped by operation type |
+
+### Cloud costs & billing
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v2/admin/dashboard/cloud-costs/daily` | Admin | Combined AWS + GCP daily costs |
+| GET | `/api/v2/admin/dashboard/cloud-costs/monthly` | Admin | Combined AWS + GCP monthly costs |
 | GET | `/api/v2/admin/dashboard/billing/aws/daily` | Admin | AWS daily billing |
 | GET | `/api/v2/admin/dashboard/billing/aws/monthly` | Admin | AWS monthly billing |
 | GET | `/api/v2/admin/dashboard/billing/gcp/monthly` | Admin | GCP monthly billing |
 | GET | `/api/v2/admin/dashboard/billing/gcp/monthly/detailed` | Admin | GCP monthly billing by SKU |
 
+### Credit override
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v2/admin/credits/set` | Admin (staging) | Force a user's credit balance to a specific value — available on staging only, used for QA scenarios |
+
 ---
 
-## 27. Help Menu
+## 28. Help Menu
 
 Prefix: `/api/v2/help`
 
@@ -598,7 +715,72 @@ Prefix: `/api/v2/help`
 
 ---
 
-## 28. Miscellaneous
+## 29. Authentication & API Keys
+
+Auth endpoints back the web dashboard's sign-up / sign-in flow. They accept a Firebase-style bearer token from the configured identity provider (Firebase or Keycloak); they do **not** accept API keys. API-key management lives here too, and is what the dashboard uses to mint and rotate keys for API callers.
+
+Prefix: `/api/v2/auth` and `/api/v2/api-keys`
+
+### Auth
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v2/auth/signup` | No | Register a new user via the identity provider |
+| POST | `/api/v2/auth/login` | No | Exchange email + password for provider tokens |
+| POST | `/api/v2/auth/google` | No | Complete a Google-OAuth login handoff |
+
+### API Keys (dashboard, Firebase-bearer)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v2/api-keys` | Bearer (Firebase) | Return the caller's current API key (or `null`); never creates |
+| POST | `/api/v2/api-keys` | Bearer (Firebase) | Return an existing key or provision one on first call |
+| POST | `/api/v2/api-keys/regenerate` | Bearer (Firebase) | Rotate the caller's API key \u2014 the old key stops working immediately |
+
+> **API-key lifecycle checks** live on `/api/v2/users` \u2014 `GET /users/api-key-check` and `GET /users/api-key-check/{user_id_param}`.
+
+---
+
+## 30. License
+
+Deployment-level entitlements. Non-raising: an expired or invalid license reports features as `false` rather than returning a `500`, so admin UI can degrade gracefully.
+
+Prefix: `/api/v2/license`
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v2/license/features` | No | `{category: bool}` map for every gateable API category |
+| GET | `/api/v2/license/status` | No | Deployment license status \u2014 `valid`, `expires_at`, tier, remaining seats |
+
+---
+
+## 31. Files
+
+Prefix: `/api/v2/files`
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v2/files/presigned-get` | Yes | 302-redirect to a presigned GET URL for a stored chat-image media handle (`med_...`). Refuses any key that is not under the caller's own `chat_images/` prefix. |
+
+---
+
+## 32. Upload Integrations
+
+Third-party media transfers. Each `transfer` returns `202` with a job that resolves once the backend has pulled the files into the target collection. See [guides/upload-integrations.md](../guides/upload-integrations.md) for OAuth setup per provider.
+
+Prefix: `/api/v2/upload`
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v2/upload/google-drive/files` | Yes | List Drive files the caller can transfer (uses Google OAuth access token) |
+| POST | `/api/v2/upload/google-drive/transfer` | Yes | Transfer selected Drive files into a collection (async, 202) |
+| GET | `/api/v2/upload/dropbox/files` | Yes | List Dropbox files the caller can transfer |
+| POST | `/api/v2/upload/dropbox/transfer` | Yes | Transfer selected Dropbox files into a collection (async, 202) |
+| POST | `/api/v2/upload/huggingface/transfer` | Yes | Transfer a Hugging Face dataset\u00a0/\u00a0repo into a collection (async, 202) |
+
+---
+
+## 33. Miscellaneous
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|

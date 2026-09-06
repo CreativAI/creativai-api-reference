@@ -28,8 +28,8 @@ client = CreativAIClient()
 
 def workflow_index_and_search(video_files: list[Path], query: str):
     """
-    Full pipeline: create collection → upload videos → wait for preprocessing
-    → index → search → print results.
+    Full pipeline: create collection → upload videos → confirm-upload with tags
+    → wait for preprocessing → index → async search → print results.
     """
     print("=== Workflow 1: Index & Search ===\n")
 
@@ -43,28 +43,53 @@ def workflow_index_and_search(video_files: list[Path], query: str):
     print(f"Created collection: {collection_id}")
 
     # 2. Upload videos
+    uploaded_uris: list[str] = []
     for video in video_files:
         uri = client.upload_file(collection_id, video)
+        uploaded_uris.append(uri)
         print(f"  Uploaded: {video.name} → {uri}")
 
-    # 3. Wait for Lambda preprocessing (splits into 16s chunks)
+    # 3. Confirm-upload: registers media, kicks off preprocessing, attaches
+    #    tags + typed metadata that later filter searches. Async job.
+    import uuid as _uuid
+    confirm = client.confirm_upload(
+        collection_id,
+        media_ids=uploaded_uris,
+        tags={"*": ["demo", "q1-2026"]},
+        metadata={"*": {"region": {"datatype": "enum", "value": "eu"}}},
+        metadata_schema={"region": {"type": "enum", "values": ["eu", "us", "apac"]}},
+        idempotency_key=str(_uuid.uuid4()),
+    )
+    print(f"Confirm-upload job: {confirm['job_id']}")
+
+    # 4. Wait for preprocessing (splits into 16s chunks)
     print("\nWaiting for preprocessing...")
     client.wait_for_preprocessing(collection_id, interval=30)
 
-    # 4. Start indexing
+    # 5. Start indexing (tags are already set from step 3 — they are NOT accepted here)
     indexing = client.start_indexing(collection_id)
     indexing_id = indexing["indexing_id"]
     print(f"\nIndexing started: {indexing_id}")
     client.wait_for_indexing(indexing_id, interval=15)
 
-    # 5. Search
-    print(f"\nSearching: '{query}'")
-    results = client.search(collection_id, query=query, top_k=10, search_type="hybrid")
-    segments = results.get("segments", [])
-    print(f"Found {len(segments)} segments")
-    for seg in segments[:3]:
-        print(f"  [{seg.get('relevance_bucket', 'N/A')}] {seg.get('uri', '')} "
-              f"@ {seg.get('start_time', 0):.1f}s – {seg.get('end_time', 0):.1f}s")
+    # 6. Search — async: submit → poll. Filter by tag + typed metadata.
+    print(f"\nSearching: '{query}' (tag=demo, region=eu)")
+    results = client.search_and_wait(
+        collection_id,
+        query=query,
+        search_type="hybrid",
+        page_size=10,
+        tags=["demo"],
+        meta_filter={"op": "and", "clauses": [
+            {"key": "region", "cmp": "==", "value": "eu"},
+        ]},
+    )
+    high = results.get("high", [])
+    print(f"Found {len(high)} high-relevance segments")
+    for seg in high[:3]:
+        print(f"  [high] {seg.get('video_s3_uri', '')} "
+              f"@ {seg.get('start_time', 0):.1f}s – {seg.get('end_time', 0):.1f}s "
+              f"score={seg.get('score', 0):.3f}")
     return results
 
 
@@ -97,8 +122,13 @@ def workflow_multimodal(video_files: list[Path], image_files: list[Path]):
     # Image-based search (multi-modal collections only)
     if image_files:
         print("\nRunning image-based search using first image as query...")
-        results = client.search_with_image_file(cid, image_files[0], top_k=5)
-        print(f"Image search found {len(results.get('segments', []))} matches")
+        # Async: encode locally then poll the search job.
+        results = client.search_and_wait(
+            cid,
+            image_base64=__import__("base64").b64encode(image_files[0].read_bytes()).decode(),
+            page_size=5,
+        )
+        print(f"Image search found {len(results.get('high', []))} high-relevance matches")
 
     return cid
 
@@ -112,8 +142,12 @@ def workflow_data_plates_ke(collection_id: str):
     """
     print("=== Workflow 3: Data Plates & KE ===\n")
 
-    # 1. Search for segments first (get search_id)
-    search_resp = client.search(collection_id, query="person not wearing hard hat on construction site", top_k=50)
+    # 1. Search for segments first (get search_id) — async
+    search_resp = client.search_and_wait(
+        collection_id,
+        query="person not wearing hard hat on construction site",
+        page_size=50,
+    )
     search_id = search_resp.get("search_id")
     print(f"Search ID: {search_id}")
 

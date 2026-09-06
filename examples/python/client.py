@@ -196,6 +196,105 @@ class CreativAIClient:
     def list_media(self, collection_id: str) -> list[dict]:
         return self._data(self._get(f"collections/{collection_id}/media"))
 
+    # ─── Confirm upload (registers media, kicks off preprocessing) ───────────
+
+    def confirm_upload(
+        self,
+        collection_id: str,
+        media_ids: list[str],
+        tags: dict[str, list[str]] | None = None,
+        metadata: dict[str, dict[str, dict]] | None = None,
+        metadata_schema: dict[str, dict] | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict:
+        """Async: returns {job_id, status, poll_url}.
+
+        tags:            {"s3://.../file.mp4": ["tag1"], "*": ["global"]}
+        metadata:        {"s3://.../file.mp4": {"duration": {"datatype": "number", "value": 24.5}}, ...}
+        metadata_schema: {"region": {"type": "enum", "values": ["eu", "us"]}}
+        """
+        body: dict = {"media_ids": media_ids}
+        if tags:
+            body["tags"] = tags
+        if metadata:
+            body["metadata"] = metadata
+        if metadata_schema:
+            body["metadata_schema"] = metadata_schema
+        headers = {"Idempotency-Key": idempotency_key} if idempotency_key else {}
+        return self._data(self._post(
+            f"collections/{collection_id}/confirm-upload", body, headers=headers,
+        ))
+
+    def get_confirm_upload_job(self, collection_id: str, job_id: str) -> dict:
+        return self._data(self._get(f"collections/{collection_id}/confirm-upload/jobs/{job_id}"))
+
+    # ─── Tags ────────────────────────────────────────────────────────────────
+
+    def list_collection_tags(self, collection_id: str) -> dict:
+        """Returns {tags: [...], tag_counts: {...}}."""
+        return self._data(self._get(f"collections/{collection_id}/tags"))
+
+    def update_collection_tags(
+        self,
+        collection_id: str,
+        add: list[str] | None = None,
+        remove: list[str] | None = None,
+        media_ids: list[str] | None = None,
+        all_media: bool = False,
+    ) -> dict:
+        """Async: rewrites every chunk row of the affected media. Returns {job_id, status, progress}."""
+        body: dict = {}
+        if add:       body["add"] = add
+        if remove:    body["remove"] = remove
+        if media_ids: body["media_ids"] = media_ids
+        if all_media: body["all_media"] = True
+        return self._data(self._post(f"collections/{collection_id}/tags", body))
+
+    def get_tag_update_job(self, collection_id: str, job_id: str) -> dict:
+        return self._data(self._get(f"collections/{collection_id}/tags/jobs/{job_id}"))
+
+    # ─── Metadata schema + updates ───────────────────────────────────────────
+
+    def get_metadata_schema(self, collection_id: str) -> dict:
+        """The collection's learned metadata registry (types, known values, ranges, counts)."""
+        return self._data(self._get(f"collections/{collection_id}/metadata-schema"))
+
+    def declare_metadata_enums(
+        self,
+        collection_id: str,
+        metadata_schema: dict[str, dict],
+    ) -> dict:
+        """Idempotent: only ever widens an enum's legal values."""
+        return self._data(self._post(
+            f"collections/{collection_id}/metadata-schema/enums",
+            {"metadata_schema": metadata_schema},
+        ))
+
+    def update_collection_metadata(
+        self,
+        collection_id: str,
+        set_values: dict[str, dict] | None = None,
+        unset: list[str] | None = None,
+        metadata_schema: dict[str, dict] | None = None,
+        media_ids: list[str] | None = None,
+        all_media: bool = False,
+    ) -> dict:
+        """Async: same {datatype, value} envelope as confirm_upload.
+
+        set_values:      {"region": {"datatype": "enum", "value": "us"}, ...}
+        metadata_schema: enum declarations applied before the delta
+        """
+        body: dict = {}
+        if set_values:      body["set"] = set_values
+        if unset:           body["unset"] = unset
+        if metadata_schema: body["metadata_schema"] = metadata_schema
+        if media_ids:       body["media_ids"] = media_ids
+        if all_media:       body["all_media"] = True
+        return self._data(self._post(f"collections/{collection_id}/metadata", body))
+
+    def get_metadata_update_job(self, collection_id: str, job_id: str) -> dict:
+        return self._data(self._get(f"collections/{collection_id}/metadata/jobs/{job_id}"))
+
     # ─── Indexing ─────────────────────────────────────────────────────────────
 
     def get_preprocessing_status(self, collection_id: str) -> dict:
@@ -217,18 +316,18 @@ class CreativAIClient:
     def start_indexing(
         self,
         collection_id: str,
-        uris: list[str] | None = None,
-        tags: dict | None = None,
+        media_ids: list[str] | None = None,
     ) -> dict:
         """
-        uris: optional list of specific S3 URIs to index (None = index all preprocessed media)
-        tags: {"uri": ["tag1", "tag2"]} or {"*": ["global-tag"]}
+        media_ids: optional list of specific media handles (S3 URIs) to index (None = index all preprocessed media)
+
+        Tags are NOT accepted here. Declare them at upload time on
+        POST /collections/{id}/confirm-upload, or change them on already-indexed
+        media with the async job at POST /collections/{id}/tags.
         """
         body: dict = {"collection_id": collection_id}
-        if uris:
-            body["uris"] = uris
-        if tags:
-            body["tags"] = tags
+        if media_ids:
+            body["media_ids"] = media_ids
         return self._data(self._post("indexing/chunk-based", body))
 
     def get_indexing_status(self, indexing_id: str) -> dict:
@@ -259,17 +358,32 @@ class CreativAIClient:
         query: str | None = None,
         image_base64: str | None = None,
         image_key: str | None = None,
+        video_key: str | None = None,
+        tags: list[str] | None = None,
+        meta_filter: dict | None = None,
+        plan_metadata: bool = False,
         top_k: int = 50,
         search_type: str = "hybrid",
-        filters: dict | None = None,
         search_id: str | None = None,
         page_number: int | None = None,
         page_size: int | None = None,
+        min_score: float | None = None,
+        include_scores: bool = False,
+        score_bins: int | None = None,
     ) -> dict:
-        """
-        search_type: "hybrid" | "vision" | "audio"
-        Response contains "search_id" plus "high", "medium", "low" segment arrays.
-        For image-based search (multimodal collections only): provide image_base64 or image_key.
+        """Submit a search.
+
+        For a new search, this returns a **submitted** job envelope
+        ``{search_job_id, poll_url, status: "submitted", ...}`` — call
+        ``wait_for_search`` (or poll ``get_search_job``) for the first page.
+
+        Paginating an existing ``search_id`` skips the async submit and returns
+        the page directly (``status: "completed"``).
+
+        tags:         restrict to media carrying at least one of these (OR semantics)
+        meta_filter:  AST filter over typed metadata, e.g.
+                        {"op": "and", "clauses": [{"key": "duration", "cmp": "<", "value": 30}]}
+        plan_metadata: let an LLM split ``query`` into a visual half + metadata clauses
         """
         body: dict = {
             "collection_id": collection_id,
@@ -277,18 +391,61 @@ class CreativAIClient:
             "search_type": search_type,
             "page_number": page_number or 1,
         }
-        if query:
-            body["text_query"] = query
-        if image_base64:
-            body["image_base64"] = image_base64
-        if image_key:
-            body["image_key"] = image_key
-        if search_id:
-            body["search_id"] = search_id
+        if query:          body["text_query"] = query
+        if image_base64:   body["image_base64"] = image_base64
+        if image_key:      body["image_key"] = image_key
+        if video_key:      body["video_key"] = video_key
+        if tags:           body["tags"] = tags
+        if meta_filter:    body["meta_filter"] = meta_filter
+        if plan_metadata:  body["plan_metadata"] = True
+        if search_id:      body["search_id"] = search_id
+        if min_score is not None: body["min_score"] = min_score
+        if include_scores: body["include_scores"] = True
+        if score_bins:     body["score_bins"] = score_bins
         return self._data(self._post("search", body))
 
+    def get_search_job(
+        self,
+        job_id: str,
+        collection_id: str | None = None,
+        page_number: int = 1,
+        page_size: int = 100,
+    ) -> dict:
+        params = {"page_number": page_number, "page_size": page_size}
+        if collection_id:
+            params["collection_id"] = collection_id
+        return self._data(self._get(f"search/jobs/{job_id}", params=params))
+
+    def wait_for_search(
+        self,
+        job_id: str,
+        collection_id: str | None = None,
+        interval: float = 2.0,
+        max_wait: int = 300,
+    ) -> dict:
+        """Poll a search job until completion. Returns the completed page."""
+        terminal = {"completed", "failed"}
+        start = time.time()
+        while True:
+            resp = self.get_search_job(job_id, collection_id=collection_id)
+            st = resp.get("status", "unknown")
+            if st in terminal:
+                return resp
+            if time.time() - start > max_wait:
+                raise TimeoutError(f"Search job {job_id} timed out")
+            time.sleep(interval)
+
+    def search_and_wait(self, *args, **kwargs) -> dict:
+        """Convenience: submit a search and block until the first page is ready."""
+        submitted = self.search(*args, **kwargs)
+        # A paginated request (search_id set) returns the page directly.
+        if submitted.get("status") == "completed":
+            return submitted
+        job_id = submitted.get("search_job_id") or submitted.get("search_id")
+        return self.wait_for_search(job_id, collection_id=kwargs.get("collection_id"))
+
     def search_with_image_file(self, collection_id: str, image_path: str | Path, **kwargs) -> dict:
-        """Search using a local image file as the query (Qwen collections only)."""
+        """Search using a local image file as the query (multimodal collections only)."""
         with open(image_path, "rb") as f:
             img_b64 = base64.b64encode(f.read()).decode()
         return self.search(collection_id, image_base64=img_b64, **kwargs)

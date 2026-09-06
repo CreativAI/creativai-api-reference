@@ -108,12 +108,24 @@ while true; do
   sleep 15
 done
 
-# 5. Search — find every moment a pedestrian is visible
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/search" \
+# 5. Search — find every moment a pedestrian is visible (async: submit → poll)
+SEARCH_JOB_ID=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v2/search" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d "{\"collection_id\": \"$COLLECTION_ID\", \"text_query\": \"pedestrian crossing road\", \"search_type\": \"hybrid\"}"
+  -d "{\"collection_id\": \"$COLLECTION_ID\", \"text_query\": \"pedestrian crossing road\", \"search_type\": \"hybrid\"}" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['search_job_id'])")
+
+while true; do
+  RESP=$(curl -s "$CREATIVAI_BASE_URL/api/v2/search/jobs/$SEARCH_JOB_ID" \
+    -H "X-API-Key: $CREATIVAI_API_KEY")
+  STATUS=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['status'])")
+  echo "Search: $STATUS"
+  [ "$STATUS" = "completed" ] && { echo "$RESP" | python3 -m json.tool; break; }
+  sleep 2
+done
 ```
+
+> **Tags and metadata at upload.** When you upload files with `POST /collections/{id}/upload-url` (see [collections.md](guides/collections.md#confirm-the-upload)), call `POST /collections/{id}/confirm-upload` afterwards with a `tags` map and/or a typed `metadata` map — those labels then narrow every future search via the `tags` / `meta_filter` fields on `POST /search`.
 
 > Also works with Dropbox (`POST /api/v2/upload/dropbox/transfer`) and Hugging Face (`POST /api/v2/upload/huggingface/transfer`). See [upload-integrations.md](guides/upload-integrations.md) for the full OAuth setup for each provider.
 
@@ -182,12 +194,12 @@ If legacy `/api/v3/` aliases exist in older clients, migrate to `/api/v2/`.
 
 ### Async Operations
 
-Long-running jobs (indexing, knowledge extraction, plate creation, S3 transfers) return `202 Accepted` immediately with a `job_id`. Poll the status endpoint until you see a terminal state.
+Long-running jobs (indexing, **search**, knowledge extraction, plate creation, S3 transfers, `confirm-upload`, tag & metadata updates) return `202 Accepted` immediately with a `job_id`. Poll the status endpoint until you see a terminal state.
 
 | State | Meaning |
 |-------|---------|
-| `initiated` | Job queued, not yet started |
-| `processing` | Actively running |
+| `initiated` / `submitted` | Job queued, not yet started |
+| `processing` / `in_progress` | Actively running |
 | `completed` | Success — results available |
 | `failed` | Permanent failure — check `error` field |
 | `partial` | Some items succeeded, some failed |
@@ -195,9 +207,15 @@ Long-running jobs (indexing, knowledge extraction, plate creation, S3 transfers)
 ```
 POST /api/v2/indexing/chunk-based          → 202 { "indexing_id": "idx_xxx" }
 GET  /api/v2/indexing/chunk-based/{id}/status → { "status": "processing" | "completed" | "failed" }
+
+POST /api/v2/search                        → 202 { "search_job_id": "ssj_xxx" }
+GET  /api/v2/search/jobs/{id}              → { "status": "in_progress" | "completed", ... }
+
+POST /api/v2/collections/{id}/confirm-upload → 202 { "job_id": "cuj_xxx" }
+GET  /api/v2/collections/{id}/confirm-upload/jobs/{id} → { "status": ..., "triggered": [], "errors": [] }
 ```
 
-**Recommended polling interval:** 5 s initially, back off to 30 s for long jobs. See [async-jobs.md](guides/async-jobs.md) for a full polling helper.
+**Recommended polling interval:** 5 s initially, back off to 30 s for long jobs. Search jobs are usually short — start at 1–2 s. See [async-jobs.md](guides/async-jobs.md) for a full polling helper.
 
 ---
 
@@ -234,8 +252,8 @@ Each guide covers one feature area in depth with request/response examples, fiel
 | Guide | What it covers | Real-world example |
 |-------|----------------|--------------------|
 | [upload-integrations.md](guides/upload-integrations.md) | Import media from Google Drive, Dropbox, and Hugging Face without local download; OAuth setup, list endpoints, transfer endpoints, per-file results | User selects 20 videos from their Google Drive; backend transfers them directly into the collection without the browser ever touching the file bytes |
-| [collections.md](guides/collections.md) | Create collections (video-only or multi-modal models), presigned S3 upload URL for direct upload, multipart upload for large files, transfer from existing S3 buckets | Ingest 500 GB of archival broadcast footage from an S3 bucket in a single transfer job |
-| [indexing-and-search.md](guides/indexing-and-search.md) | Start indexing jobs, poll status, estimate credit cost, semantic/visual/audio search, pagination, image-query search | "Find all moments a red Ferrari is visible" — visual search using an uploaded reference image |
+| [collections.md](guides/collections.md) | Create collections (video-only or multi-modal models), presigned S3 upload URL for direct upload, `confirm-upload` for preprocessing + tags/metadata, multipart upload for large files, transfer from existing S3 buckets, tag vocabulary + async tag updates, learned metadata schema + typed metadata updates | Attach `region: eu` and tags `["lobby", "camera-1"]` at upload time; add `reviewed: true` to 800 clips later with one async update job |
+| [indexing-and-search.md](guides/indexing-and-search.md) | Start indexing jobs, poll status, estimate credit cost, **async** semantic/visual/audio search (poll `GET /search/jobs/{id}`), pagination, filter by tags and typed `meta_filter`, LLM query planner (`plan_metadata`), image + video-query search | "Clips under 30 seconds showing a crosswalk, collected in the EU" — planner splits it into `duration < 30`, `region == "eu"`, and a visual search for `"a crosswalk"` |
 
 ### Analysis & Extraction
 

@@ -371,8 +371,11 @@ Keep polling until `status` is `"completed"`, `"partial"`, or `"failed"`. Typica
 
 ## Step 6 — Search
 
+Search is **asynchronous**. `POST /search` returns `202` with a `search_job_id`; poll `GET /search/jobs/{id}` until the job reports `status: "completed"`, at which point the response carries the first page of bucketed results.
+
 ```bash
-curl -X POST "$CREATIVAI_BASE_URL/api/v2/search" \
+# Submit the search
+SUBMIT=$(curl -sf -X POST "$CREATIVAI_BASE_URL/api/v2/search" \
   -H "X-API-Key: $CREATIVAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -380,8 +383,22 @@ curl -X POST "$CREATIVAI_BASE_URL/api/v2/search" \
     "text_query": "person walking into a room",
     "search_type": "hybrid",
     "page_size": 20
-  }'
+  }')
+SEARCH_JOB_ID=$(echo "$SUBMIT" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['search_job_id'])")
+
+# Poll until completed
+while true; do
+  RESP=$(curl -sf "$CREATIVAI_BASE_URL/api/v2/search/jobs/$SEARCH_JOB_ID" \
+    -H "X-API-Key: $CREATIVAI_API_KEY")
+  STATUS=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['status'])")
+  [ "$STATUS" = "completed" ] && break
+  [ "$STATUS" = "failed" ]    && { echo "$RESP" | python3 -m json.tool; exit 1; }
+  sleep 2
+done
+echo "$RESP" | python3 -m json.tool
 ```
+
+> **Narrow the search.** Add `tags: ["lobby"]` or a typed `meta_filter` (`{"op": "and", "clauses": [{"key": "region", "cmp": "==", "value": "eu"}]}`) to restrict results to media already carrying those labels — declared at upload time on `confirm-upload`. See [indexing-and-search.md](indexing-and-search.md#filter-by-tags-and-metadata).
 
 **Response:**
 ```json

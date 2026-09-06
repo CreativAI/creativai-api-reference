@@ -291,10 +291,60 @@ After the sub-jobs are cancelled, re-send the stop request.
 
 ## Check Agent Status
 
+The agent's current state (idle / thinking / awaiting-interrupt) rides on the session document — read it with `GET /api/v2/agentic-chat/sessions/{session_id}` and look at the `status` field there.
+
 ```bash
-curl "$CREATIVAI_BASE_URL/api/v2/agentic-chat/sessions/$SESSION_ID/status" \
+curl "$CREATIVAI_BASE_URL/api/v2/agentic-chat/sessions/$SESSION_ID" \
   -H "X-API-Key: $CREATIVAI_API_KEY"
 ```
+
+---
+
+## One-Shot Structured-Output Query
+
+If you want a typed JSON answer from a collection without opening a session, submit a **structured query**. The endpoint is async: it returns `202` with a `job_id` and you poll for the parsed result.
+
+```bash
+# Submit
+JOB=$(curl -s -X POST "$CREATIVAI_BASE_URL/api/v2/agentic-chat/structured-query" \
+  -H "X-API-Key: $CREATIVAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "collection_id": "'$COLLECTION_ID'",
+    "query": "List every distinct vehicle that appears at the loading bay, with the timestamp of first appearance.",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "vehicles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "vehicle_type": {"type": "string"},
+              "first_seen_at": {"type": "number"}
+            },
+            "required": ["vehicle_type", "first_seen_at"]
+          }
+        }
+      },
+      "required": ["vehicles"]
+    }
+  }')
+JOB_ID=$(echo $JOB | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['job_id'])")
+
+# Poll until completed
+while true; do
+  RESP=$(curl -s "$CREATIVAI_BASE_URL/api/v2/agentic-chat/structured-query/$JOB_ID" \
+    -H "X-API-Key: $CREATIVAI_API_KEY")
+  STATUS=$(echo $RESP | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['status'])")
+  [ "$STATUS" = "completed" ] && break
+  [ "$STATUS" = "failed" ]    && { echo "$RESP" | python3 -m json.tool; exit 1; }
+  sleep 2
+done
+echo "$RESP" | python3 -m json.tool
+```
+
+The completed response carries the parsed JSON in `data.result` matching the schema you supplied. Unlike a session-based chat there is no message history, no interrupts, and no SSE.
 
 ---
 

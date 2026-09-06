@@ -81,6 +81,87 @@ curl -sf -X POST "$BASE/api/v2/collections/$COL_ID/upload-urls" \
     ]
   }' | python3 -m json.tool
 
+# ─── Confirm-upload (async: registers media, kicks off preprocessing,
+#     attaches tags & typed metadata) ───────────────────────────────────────
+echo "=== 10b. Confirm upload with tags + metadata ==="
+CONFIRM=$(curl -sf -X POST "$BASE/api/v2/collections/$COL_ID/confirm-upload" \
+  -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen 2>/dev/null || python3 -c 'import uuid;print(uuid.uuid4())')" \
+  -d "{
+    \"media_ids\": [
+      \"s3://your-bucket/collections/$COL_ID/uploads/lobby.mp4\",
+      \"s3://your-bucket/collections/$COL_ID/uploads/entrance.mp4\"
+    ],
+    \"tags\": {
+      \"*\": [\"q1-2026\", \"security\"],
+      \"s3://your-bucket/collections/$COL_ID/uploads/lobby.mp4\": [\"lobby\", \"camera-1\"]
+    },
+    \"metadata\": {
+      \"*\": {
+        \"region\": {\"datatype\": \"enum\", \"value\": \"eu\"}
+      },
+      \"s3://your-bucket/collections/$COL_ID/uploads/lobby.mp4\": {
+        \"duration\": {\"datatype\": \"number\", \"value\": 24.5},
+        \"cameras\":  {\"datatype\": \"list\",   \"value\": [\"front\", \"rear\"]}
+      }
+    },
+    \"metadata_schema\": {
+      \"region\": {\"type\": \"enum\", \"values\": [\"eu\", \"us\", \"apac\"]}
+    }
+  }")
+echo "$CONFIRM" | python3 -m json.tool
+CONFIRM_JOB=$(echo "$CONFIRM" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['job_id'])")
+
+echo "=== 10c. Poll confirm-upload job ==="
+curl -sf "$BASE/api/v2/collections/$COL_ID/confirm-upload/jobs/$CONFIRM_JOB" \
+  -H "X-API-Key: $KEY" | python3 -m json.tool
+
+# ─── Tags: vocabulary + async delta updates ──────────────────────────────────
+echo "=== 10d. List the collection's tag vocabulary ==="
+curl -sf "$BASE/api/v2/collections/$COL_ID/tags" -H "X-API-Key: $KEY" | python3 -m json.tool
+
+echo "=== 10e. Update tags on specific media (async job) ==="
+TAG_JOB=$(curl -sf -X POST "$BASE/api/v2/collections/$COL_ID/tags" \
+  -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d "{
+    \"add\":    [\"reviewed\"],
+    \"remove\": [\"draft\"],
+    \"media_ids\": [\"s3://your-bucket/collections/$COL_ID/uploads/lobby.mp4\"]
+  }")
+echo "$TAG_JOB" | python3 -m json.tool
+TAG_JOB_ID=$(echo "$TAG_JOB" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['job_id'])")
+curl -sf "$BASE/api/v2/collections/$COL_ID/tags/jobs/$TAG_JOB_ID" \
+  -H "X-API-Key: $KEY" | python3 -m json.tool
+
+# ─── Metadata: read schema, declare enums, update values ─────────────────────
+echo "=== 10f. Read the learned metadata schema ==="
+curl -sf "$BASE/api/v2/collections/$COL_ID/metadata-schema" \
+  -H "X-API-Key: $KEY" | python3 -m json.tool
+
+echo "=== 10g. Declare (or widen) an enum key ==="
+curl -sf -X POST "$BASE/api/v2/collections/$COL_ID/metadata-schema/enums" \
+  -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{
+    "metadata_schema": {
+      "region": {"type": "enum", "values": ["eu", "us", "apac", "latam"]}
+    }
+  }' | python3 -m json.tool
+
+echo "=== 10h. Set/unset metadata on existing media (async job) ==="
+META_JOB=$(curl -sf -X POST "$BASE/api/v2/collections/$COL_ID/metadata" \
+  -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d "{
+    \"set\": {
+      \"reviewed\": {\"datatype\": \"bool\", \"value\": true}
+    },
+    \"unset\": [\"draft\"],
+    \"media_ids\": [\"s3://your-bucket/collections/$COL_ID/uploads/entrance.mp4\"]
+  }")
+echo "$META_JOB" | python3 -m json.tool
+META_JOB_ID=$(echo "$META_JOB" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['job_id'])")
+curl -sf "$BASE/api/v2/collections/$COL_ID/metadata/jobs/$META_JOB_ID" \
+  -H "X-API-Key: $KEY" | python3 -m json.tool
+
 # ─── Multipart Upload (large files) ──────────────────────────────────────────
 echo "=== 11. Initiate multipart upload ==="
 MP_INIT=$(curl -sf -X POST "$BASE/api/v2/collections/uploads/initiate" \
